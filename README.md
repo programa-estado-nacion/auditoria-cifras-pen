@@ -55,7 +55,7 @@ Para probarlo dentro de Word, se carga `manifest.xml` (sideload).
 Para regenerar el manifiesto de producción:
 
 ```bash
-./deploy/configurar-url.sh https://aguero-pen.github.io/auditoria-cifras-pen
+./deploy/configurar-url.sh https://programa-estado-nacion.github.io/auditoria-cifras-pen
 ```
 
 Ese `manifest-produccion.xml` es el archivo que se reparte a los usuarios; no se versiona

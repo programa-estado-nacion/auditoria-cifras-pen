@@ -12,17 +12,17 @@ Resumen del flujo:
 ## Parte A — Hospedar los archivos (ya está hecho)
 
 La interfaz del complemento se publica sola en **GitHub Pages** desde el repositorio
-`aguero-pen/auditoria-cifras-pen`. La URL es:
+`programa-estado-nacion/auditoria-cifras-pen`. La URL es:
 
 ```
-https://aguero-pen.github.io/auditoria-cifras-pen/
+https://programa-estado-nacion.github.io/auditoria-cifras-pen/
 ```
 
 Cada vez que se sube un cambio a la rama `main`, GitHub vuelve a publicar el contenido de
 `src/` automáticamente. No hay que arrastrar carpetas ni hacer nada manual.
 
 Se puede comprobar abriendo en el navegador
-`https://aguero-pen.github.io/auditoria-cifras-pen/taskpane.html` (debe cargar el panel).
+`https://programa-estado-nacion.github.io/auditoria-cifras-pen/taskpane.html` (debe cargar el panel).
 
 > Privacidad: en GitHub Pages solo viven los archivos de la interfaz (HTML/JS/CSS). Los
 > documentos que se auditan **nunca salen de la computadora** de cada usuario; el
@@ -38,13 +38,13 @@ regenerarlo si cambia la URL de hospedaje.
 En Windows, desde la carpeta `deploy/` en PowerShell:
 
 ```
-.\configurar-url.ps1 -Url "https://aguero-pen.github.io/auditoria-cifras-pen"
+.\configurar-url.ps1 -Url "https://programa-estado-nacion.github.io/auditoria-cifras-pen"
 ```
 
 En macOS o Linux:
 
 ```
-./deploy/configurar-url.sh https://aguero-pen.github.io/auditoria-cifras-pen
+./deploy/configurar-url.sh https://programa-estado-nacion.github.io/auditoria-cifras-pen
 ```
 
 Esto crea **`manifest-produccion.xml`** ya apuntando a tu sitio. Ese es el archivo que
