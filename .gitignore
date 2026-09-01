@@ -1,0 +1,5 @@
+node_modules/
+.DS_Store
+# Manifiesto generado por deploy/configurar-url.* — no se versiona:
+# se regenera con la URL de destino cada vez que hace falta.
+deploy/manifest-produccion.xml

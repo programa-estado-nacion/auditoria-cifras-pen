@@ -1,0 +1,3645 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Auditoría de Cifras — revisión PEN v18</title>
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Requerido para funcionar como complemento (task pane) de Word, incluido Word en línea. -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #F2EFE9; color: #2C2C2C; font-size: 14px; min-height: 100vh; }
+
+    /* HEADER */
+    header { background: #1B2B4B; color: #fff; padding: 0 28px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+    .h-top { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 8px; }
+    .h-marca { font-size: 10px; letter-spacing: .12em; color: #F0D98B; font-weight: 700; text-transform: uppercase; margin-bottom: 3px; }
+    .h-titulo { font-family: Georgia, serif; font-size: 19px; font-weight: 700; }
+    .h-stats { display: flex; gap: 20px; }
+    .stat { text-align: center; }
+    .stat-n { font-size: 22px; font-weight: 800; line-height: 1; }
+    .stat-l { font-size: 10px; opacity: .7; margin-top: 1px; }
+    .s-v{color:#4ADE80;} .s-a{color:#FDE047;} .s-r{color:#F87171;} .s-t{color:#C9A84C;}
+    .h-prog { padding-bottom: 10px; display: none; }
+    .h-prog-track { height: 4px; border-radius: 2px; background: rgba(255,255,255,.15); display: flex; overflow: hidden; margin-bottom: 3px; }
+    .h-prog-lbl { font-size: 10px; color: rgba(255,255,255,.4); }
+    .tabs { display: flex; }
+    .tab { background: transparent; color: rgba(255,255,255,.6); border: none; padding: 10px 18px; font-weight: 700; font-size: 13px; cursor: pointer; border-radius: 6px 6px 0 0; transition: all .2s; }
+    .tab:hover { color: #fff; }
+    .tab.activo { background: #C9A84C; color: #1B2B4B; }
+    .tab .bdg { background: rgba(255,255,255,.2); border-radius: 10px; padding: 1px 7px; font-size: 11px; margin-left: 5px; }
+    .tab.activo .bdg { background: rgba(27,43,75,.2); }
+
+    /* MAIN */
+    main { max-width: 980px; margin: 0 auto; padding: 24px 28px; }
+
+    /* CARD */
+    .card { background: #fff; border: 1px solid #D9D4C8; border-radius: 10px; padding: 20px; margin-bottom: 18px; }
+    .card h2 { font-family: Georgia, serif; font-size: 15px; color: #1B2B4B; margin-bottom: 5px; }
+    .card .desc { font-size: 13px; color: #6B7280; line-height: 1.6; margin-bottom: 16px; }
+
+
+    /* ── ZONA DE CARGA MASIVA ── */
+    .zona-drop {
+      border: 3px dashed #C9A84C;
+      border-radius: 14px;
+      background: #FFFBEB;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 32px 24px;
+      transition: all .2s;
+      cursor: pointer;
+      position: relative;
+    }
+    .zona-drop.drag-over {
+      border-color: #1B2B4B;
+      background: #EEF2FF;
+      transform: scale(1.01);
+      box-shadow: 0 0 0 4px rgba(27,43,75,.1);
+    }
+    .zona-drop .zd-icono { font-size: 48px; margin-bottom: 12px; line-height: 1; }
+    .zona-drop .zd-titulo { font-size: 18px; font-weight: 700; color: #1B2B4B; margin-bottom: 6px; }
+    .zona-drop .zd-sub { font-size: 13px; color: #6B7280; line-height: 1.6; margin-bottom: 18px; }
+    .zona-drop .zd-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .zd-btn {
+      padding: 9px 18px; border-radius: 7px; font-size: 13px; font-weight: 700;
+      cursor: pointer; border: 2px solid; transition: all .15s;
+    }
+    .zd-btn-archivos { background: #1B2B4B; color: #fff; border-color: #1B2B4B; }
+    .zd-btn-archivos:hover { background: #253A60; }
+    .zd-btn-carpeta  { background: #fff; color: #854D0E; border-color: #C9A84C; }
+    .zd-btn-carpeta:hover { background: #FFFBEB; }
+
+    /* Cola de espera (archivos detectados, antes de procesar) */
+    .cola-wrap { margin-top: 16px; display: none; }
+    .cola-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .cola-header .cola-titulo { font-size: 13px; font-weight: 700; color: #1B2B4B; }
+    .cola-header .cola-n { background: #1B2B4B; color: #C9A84C; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 20px; margin-left: 8px; }
+    .cola-lista { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; margin-bottom: 14px; max-height: 220px; overflow-y: auto; }
+    .cola-item { display: flex; align-items: center; gap: 7px; background: #F9F8F6; border: 1px solid #D9D4C8; border-radius: 6px; padding: 7px 10px; min-width: 0; }
+    .cola-item-nombre { flex: 1; font-size: 12px; color: #1B2B4B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cola-item-del { background: none; border: none; color: #9CA3AF; cursor: pointer; font-size: 14px; padding: 0; flex-shrink: 0; }
+    .cola-item-del:hover { color: #991B1B; }
+
+    /* Botón procesar */
+    .btn-procesar {
+      width: 100%; padding: 14px; background: #2D7D46; color: #fff;
+      border: none; border-radius: 8px; font-size: 16px; font-weight: 700;
+      cursor: pointer; transition: background .2s; display: flex;
+      align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-procesar:hover { background: #1e5c33; }
+    .btn-procesar:disabled { background: #9CA3AF; cursor: not-allowed; }
+
+    /* Barra de progreso de procesamiento */
+    .proc-prog { display: none; margin-top: 14px; padding: 14px 16px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; }
+    .proc-prog-msg  { font-size: 13px; color: #1D4ED8; font-weight: 700; margin-bottom: 8px; }
+    .proc-prog-track { height: 8px; border-radius: 4px; background: #BFDBFE; overflow: hidden; }
+    .proc-prog-fill  { height: 100%; background: #3B82F6; width: 0%; transition: width .3s; border-radius: 4px; }
+    .proc-prog-det   { font-size: 11px; margin-top: 6px; color: #3B82F6; }
+
+    /* Lista de fuentes ya procesadas */
+    .procesadas-wrap { margin-top: 18px; display: none; }
+    .procesadas-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .procesadas-titulo { font-size: 13px; font-weight: 700; color: #1B2B4B; display: flex; align-items: center; gap: 8px; }
+    .procesadas-n { background: #2D7D46; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 20px; }
+    .procesadas-lista { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; }
+    .proc-item { display: flex; align-items: center; gap: 7px; background: #E8F5ED; border: 1px solid #BBF7D0; border-radius: 6px; padding: 7px 10px; min-width: 0; }
+    .proc-item-nombre { flex: 1; font-size: 12px; font-weight: 600; color: #166534; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .proc-item-meta { font-size: 10px; color: #6B7280; flex-shrink: 0; }
+    .proc-item-del { background: none; border: none; color: #9CA3AF; cursor: pointer; font-size: 14px; padding: 0; flex-shrink: 0; }
+    .proc-item-del:hover { color: #991B1B; }
+
+    /* ── PANEL DE FUENTES (colapsable en revisión) ── */
+    .panel-fuentes { background: #fff; border: 1px solid #D9D4C8; border-radius: 10px; margin-bottom: 18px; overflow: hidden; }
+    .pf-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 20px; background: #F9F8F6; cursor: pointer; user-select: none;
+      transition: background .15s;
+    }
+    .pf-header:hover { background: #F2EFE9; }
+    .pf-header-izq { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; color: #1B2B4B; }
+    .pf-cnt { font-size: 11px; background: #1B2B4B; color: #C9A84C; padding: 2px 9px; border-radius: 20px; font-weight: 700; }
+    .pf-hint { font-size: 12px; color: #9CA3AF; }
+    .pf-tog { font-size: 12px; color: #9CA3AF; }
+    .pf-body { border-top: 1px solid #E5E7EB; padding: 16px 20px; }
+
+    /* Zonas de carga dentro del panel */
+    .pf-zonas { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .zona {
+      border: 2px dashed #D9D4C8; border-radius: 8px; padding: 16px 10px;
+      text-align: center; cursor: pointer; transition: all .2s; background: #F9F8F6;
+    }
+    .zona:hover { border-color: #1B2B4B; background: #EEF0F5; }
+    .zona input[type=file] { display: none; }
+    .zona .zi { font-size: 24px; margin-bottom: 5px; }
+    .zona .zt { font-weight: 700; color: #1B2B4B; font-size: 13px; margin-bottom: 3px; }
+    .zona .zs { font-size: 11px; color: #9CA3AF; line-height: 1.4; }
+    .zona-carpeta { border-color: #C9A84C; background: #FFFBEB; }
+    .zona-carpeta:hover { border-color: #854D0E; background: #FEF3C7; }
+    .zona-carpeta .zt { color: #854D0E; }
+
+    /* Barra de progreso de carga */
+    .pf-prog { display: none; margin-bottom: 12px; padding: 10px 14px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 7px; }
+    .pf-prog-msg { font-size: 12px; color: #1D4ED8; font-weight: 600; margin-bottom: 5px; }
+    .pf-prog-track { height: 5px; border-radius: 3px; background: #BFDBFE; overflow: hidden; }
+    .pf-prog-fill { height: 100%; background: #3B82F6; width: 0%; transition: width .3s; border-radius: 3px; }
+    .pf-prog-detalle { font-size: 11px; margin-top: 4px; color: #3B82F6; }
+
+    /* Lista de fuentes cargadas */
+    .pf-lista-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .pf-lista-header span { font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: .06em; }
+    .btn-quitar-todas { background: none; border: 1px solid #FCA5A5; color: #991B1B; padding: 3px 10px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; }
+    .btn-quitar-todas:hover { background: #FEE2E2; }
+    .pf-lista { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .pf-item { display: flex; align-items: center; gap: 8px; background: #F9F8F6; border: 1px solid #D9D4C8; border-radius: 6px; padding: 7px 10px; min-width: 0; }
+    .pf-item-nombre { flex: 1; font-size: 12px; font-weight: 600; color: #1B2B4B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pf-item-meta { font-size: 10px; color: #9CA3AF; flex-shrink: 0; }
+    .pf-item-del { background: none; border: none; color: #9CA3AF; cursor: pointer; font-size: 14px; padding: 0 2px; flex-shrink: 0; line-height: 1; }
+    .pf-item-del:hover { color: #991B1B; }
+    .pf-vacio { font-size: 13px; color: #9CA3AF; text-align: center; padding: 12px 0; }
+
+    /* TIPO BADGES */
+    .ftipo { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; flex-shrink: 0; }
+    .ft-docx { background: #DBEAFE; color: #1D4ED8; }
+    .ft-pdf  { background: #FEE2E2; color: #991B1B; }
+    .ft-xlsx { background: #D1FAE5; color: #065F46; }
+    .ft-html { background: #F3E8FF; color: #6B21A8; }
+    .ft-txt  { background: #E0F2FE; color: #075985; }
+    .ft-csv  { background: #ECFCCB; color: #3F6212; }
+
+    /* PANEL REVISIÓN */
+    .panel-rev { background: #fff; border: 1px solid #D9D4C8; border-radius: 10px; padding: 20px; margin-bottom: 18px; }
+    .panel-rev h2 { font-family: Georgia, serif; font-size: 15px; color: #1B2B4B; margin-bottom: 14px; }
+    .campo label { display: block; font-size: 11px; font-weight: 700; color: #1B2B4B; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; }
+    .campo input, .campo select, .campo textarea {
+      width: 100%; padding: 9px 11px; border: 1px solid #D9D4C8; border-radius: 6px;
+      font-size: 13px; font-family: inherit; background: #F9F8F6; color: #2C2C2C; outline: none; transition: border-color .2s;
+    }
+    .campo input:focus, .campo select:focus, .campo textarea:focus { border-color: #1B2B4B; background: #fff; }
+    .campo textarea { resize: vertical; }
+
+    /* GESTIÓN DE REVISORES */
+    .rev-agregar { display: grid; grid-template-columns: 1fr auto; gap: 7px; margin-top: 7px; }
+    .rev-agregar input { min-width: 0; }
+    .btn-rev-add {
+      border: none; border-radius: 6px; padding: 8px 12px; background: #1B2B4B; color: #fff;
+      font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+    }
+    .btn-rev-add:hover { background: #253A60; }
+    .rev-lista { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; min-height: 22px; }
+    .rev-chip {
+      display: inline-flex; align-items: center; gap: 6px; background: #EEF2FF; color: #1B2B4B;
+      border: 1px solid #C7D2FE; border-radius: 20px; padding: 4px 8px 4px 10px;
+      font-size: 11px; font-weight: 600;
+    }
+    .rev-chip button { background: none; border: none; color: #6B7280; cursor: pointer; font-size: 13px; line-height: 1; padding: 0; }
+    .rev-chip button:hover { color: #991B1B; }
+    .rev-vacio { font-size: 11px; color: #9CA3AF; padding-top: 2px; }
+
+    .form2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .form-full { grid-column: 1 / -1; }
+
+    /* BOTONES */
+    .btn-p { background: #1B2B4B; color: #fff; border: none; padding: 10px 24px; border-radius: 7px; font-weight: 700; font-size: 14px; cursor: pointer; transition: background .2s; }
+    .btn-p:hover { background: #253A60; }
+    .btn-buscar { background: #1B2B4B; color: #fff; border: none; padding: 11px 28px; border-radius: 7px; font-weight: 700; font-size: 14px; cursor: pointer; width: 100%; margin-top: 4px; transition: background .2s; }
+    .btn-buscar:hover { background: #253A60; }
+    .btn-registrar { background: #2D7D46; color: #fff; border: none; padding: 11px 28px; border-radius: 7px; font-weight: 700; font-size: 14px; cursor: pointer; width: 100%; margin-top: 14px; transition: background .2s; }
+    .btn-registrar:hover { background: #1e5c33; }
+    .btn-s { background: #fff; color: #1B2B4B; border: 1px solid #D9D4C8; padding: 7px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; }
+    .btn-s:hover { background: #F2EFE9; }
+
+    /* CONTROLES DEL MANUAL PEN */
+    .manual-alertas { margin-top: 12px; }
+    .manual-alerta { padding: 10px 13px; border-radius: 7px; margin-bottom: 7px; font-size: 12px; line-height: 1.5; }
+    .manual-alerta.aviso { background:#FFF7ED; border:1px solid #FDBA74; color:#9A3412; }
+    .manual-alerta.info { background:#EFF6FF; border:1px solid #BFDBFE; color:#1D4ED8; }
+    .manual-alerta.ok { background:#F0FDF4; border:1px solid #BBF7D0; color:#166534; }
+    .manual-box { margin-top: 14px; border: 1px solid #D9D4C8; border-radius: 9px; background:#FAFAF9; padding:14px 16px; }
+    .manual-box-titulo { font-size:12px; font-weight:800; color:#1B2B4B; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
+    .manual-box-desc { font-size:12px; color:#6B7280; line-height:1.5; margin-bottom:12px; }
+    .manual-meta { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:11px; }
+    .manual-checks { display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; }
+    .manual-check { display:flex; align-items:flex-start; gap:8px; font-size:12px; color:#374151; line-height:1.35; cursor:pointer; }
+    .manual-check input { margin-top:2px; accent-color:#2D7D46; flex-shrink:0; }
+    .manual-resumen { display:inline-flex; align-items:center; gap:5px; margin-top:8px; padding:4px 9px; border-radius:15px; background:#EEF2FF; color:#1B2B4B; font-size:11px; font-weight:700; }
+    .manual-detalle { margin-top:10px; padding:10px 12px; background:#fff; border:1px solid #E5E7EB; border-radius:7px; }
+    .manual-detalle-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; margin-top:8px; }
+    .manual-detalle label { font-size:11px; color:#4B5563; }
+    .manual-detalle input[type=checkbox] { accent-color:#2D7D46; }
+    .manual-ayuda { margin:10px 0 13px; border:1px solid #BFDBFE; border-radius:8px; background:#EFF6FF; overflow:hidden; }
+    .manual-ayuda summary { cursor:pointer; list-style:none; padding:10px 12px; color:#1D4ED8; font-size:12px; font-weight:800; user-select:none; }
+    .manual-ayuda summary::-webkit-details-marker { display:none; }
+    .manual-ayuda summary::after { content:'▼'; float:right; font-size:10px; margin-top:2px; }
+    .manual-ayuda[open] summary::after { content:'▲'; }
+    .manual-ayuda-contenido { border-top:1px solid #BFDBFE; background:#fff; padding:11px 13px; color:#374151; font-size:12px; line-height:1.55; }
+    .manual-ayuda-contenido p { margin:0 0 8px; }
+    .manual-ayuda-contenido p:last-child { margin-bottom:0; }
+    .manual-ayuda-contenido strong { color:#1B2B4B; }
+    .manual-nota-aplica { margin:0 0 11px; padding:8px 10px; border-radius:6px; background:#FFFBEB; border:1px solid #FDE68A; color:#854D0E; font-size:11px; line-height:1.45; }
+    .campo-ayuda { display:block; margin-top:4px; color:#6B7280; font-size:10px; line-height:1.35; }
+    @media (max-width:700px) {
+      .manual-meta, .manual-checks, .manual-detalle-grid { grid-template-columns:1fr; }
+    }
+
+    /* SEMÁFORO */
+    .sem-wrap { margin-top: 16px; }
+    .sem-wrap label { display: block; font-size: 11px; font-weight: 700; color: #1B2B4B; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+    .sem-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .sem-btn { border: 2px solid #D9D4C8; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s; background: #F9F8F6; color: #6B7280; display: flex; align-items: center; gap: 6px; }
+    .sem-btn:hover { border-color: #9CA3AF; }
+    .sel-verde    { background: #DCFCE7!important; color: #166534!important; border-color: #4ADE80!important; }
+    .sel-amarillo { background: #FEF9C3!important; color: #854D0E!important; border-color: #FDE047!important; }
+    .sel-rojo     { background: #FEE2E2!important; color: #991B1B!important; border-color: #F87171!important; }
+
+    /* RESULTADOS BÚSQUEDA */
+    .resultados-busqueda { margin-top: 16px; }
+    .res-header { font-size: 12px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+    .res-item { border: 1px solid #D9D4C8; border-radius: 8px; padding: 14px 16px; margin-bottom: 8px; background: #fff; transition: border-color .15s, box-shadow .15s, background .15s; }
+    .res-item.fuente-elegida { border-color:#2D7D46; box-shadow:0 0 0 2px rgba(45,125,70,.12); background:#F7FCF8; }
+    .res-item-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap:wrap; }
+    .fuente-instruccion { margin-bottom:10px; padding:11px 14px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; color:#1D4ED8; font-size:12px; line-height:1.5; }
+    .fuente-opcion { display:inline-flex; align-items:center; gap:6px; margin-left:auto; padding:6px 10px; border:1px solid #D9D4C8; border-radius:6px; background:#fff; color:#1B2B4B; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .fuente-opcion:hover { border-color:#2D7D46; background:#F0FDF4; }
+    .fuente-opcion input { accent-color:#2D7D46; cursor:pointer; }
+    .fuente-ninguna { display:flex; align-items:center; justify-content:flex-end; margin:10px 0 2px; }
+    .res-fnombre { font-size: 13px; font-weight: 700; color: #1B2B4B; flex: 1; }
+    .res-cant { font-size: 12px; color: #6B7280; }
+    .res-fragmento { background: #F9F8F6; border-left: 3px solid #C9A84C; padding: 8px 12px; border-radius: 0 6px 6px 0; font-family: Georgia, serif; font-size: 13px; line-height: 1.7; color: #2C2C2C; margin-bottom: 6px; }
+    .res-fragmento mark { background: #FEF08A; color: #1B2B4B; border-radius: 2px; padding: 0 2px; }
+    .sin-resultados { text-align: center; padding: 20px; background: #FEF9C3; border: 1px solid #FDE047; border-radius: 8px; color: #854D0E; font-size: 13px; }
+
+    .res-score { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+    .res-score-alto { background:#DCFCE7; color:#166534; }
+    .res-score-medio { background:#FEF9C3; color:#854D0E; }
+    .res-descartadas { margin-top:10px; padding:10px 12px; border-radius:7px; background:#F3F4F6; color:#6B7280; font-size:12px; line-height:1.5; }
+
+    /* FILTROS */
+    .filtros { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; background: #fff; border: 1px solid #D9D4C8; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; }
+    .filtros input, .filtros select { padding: 7px 10px; border: 1px solid #D9D4C8; border-radius: 6px; font-size: 13px; background: #F9F8F6; color: #2C2C2C; outline: none; }
+    .filtros input { width: 200px; }
+    .filtros select { width: 150px; }
+    .filtros .ml { margin-left: auto; display: flex; gap: 8px; }
+
+    /* LISTA REGISTROS */
+    #lista { display: flex; flex-direction: column; gap: 8px; }
+    .tarjeta { background: #fff; border: 1px solid #D9D4C8; border-radius: 9px; overflow: hidden; }
+    .tarjeta-cab { display: grid; grid-template-columns: 8px 1fr auto auto 32px; align-items: center; gap: 12px; padding: 11px 16px; cursor: pointer; user-select: none; }
+    .tarjeta-cab:hover { background: #F9F8F6; }
+    .sb { border-radius: 4px; align-self: stretch; min-height: 38px; width: 8px; }
+    .sb-v{background:#4ADE80;} .sb-a{background:#FDE047;} .sb-r{background:#F87171;} .sb-p{background:#D1D5DB;}
+    .tid { font-family: monospace; font-size: 11px; color: #9CA3AF; font-weight: 700; }
+    .tcifra { font-family: Georgia, serif; font-size: 15px; font-weight: 700; color: #1B2B4B; }
+    .tctx { font-size: 11px; color: #9CA3AF; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .spill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
+    .sp-v{background:#DCFCE7;color:#166534;} .sp-a{background:#FEF9C3;color:#854D0E;} .sp-r{background:#FEE2E2;color:#991B1B;} .sp-p{background:#F3F4F6;color:#6B7280;}
+    .trev { font-size: 12px; color: #9CA3AF; min-width: 70px; text-align: right; }
+    .ttog { color: #9CA3AF; font-size: 11px; }
+    .tarjeta-det { border-top: 1px solid #F3F4F6; padding: 16px 18px; background: #F9F8F6; }
+    .ctx-bloque { background: #fff; border-left: 3px solid #C9A84C; padding: 10px 14px; border-radius: 0 6px 6px 0; font-family: Georgia, serif; font-size: 13px; line-height: 1.7; color: #2C2C2C; margin-bottom: 14px; }
+    .det2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .det-full2 { grid-column: 1 / -1; }
+    .det-acciones { display: flex; justify-content: flex-end; margin-top: 12px; }
+    .btn-del { background: none; border: 1px solid #FCA5A5; color: #991B1B; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .btn-del:hover { background: #FEE2E2; }
+
+    /* VACIO */
+    .vacio { text-align: center; padding: 50px 0; color: #9CA3AF; }
+    .vacio .vi { font-size: 36px; margin-bottom: 10px; }
+    .vacio .vt { font-size: 15px; font-weight: 600; color: #6B7280; }
+    .vacio .vd { font-size: 13px; margin-top: 5px; line-height: 1.6; }
+
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; align-items: center; justify-content: center; }
+    .modal-overlay.abierto { display: flex; }
+    .modal { background: #fff; border-radius: 12px; padding: 28px; max-width: 680px; width: 90%; max-height: 85vh; overflow-y: auto; }
+    .modal h2 { font-family: Georgia, serif; font-size: 17px; color: #1B2B4B; margin-bottom: 18px; }
+    .rep-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 18px; }
+    .rep-card { border-radius: 8px; padding: 14px; text-align: center; }
+    .rep-n { font-size: 26px; font-weight: 800; line-height: 1; }
+    .rep-l { font-size: 12px; font-weight: 700; margin-top: 3px; }
+    .rep-p { font-size: 11px; opacity: .7; }
+    .alerta { border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+    .alerta h3 { font-size: 13px; margin-bottom: 8px; }
+    .ai { font-size: 12px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(0,0,0,.06); }
+    .ai:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+    /* VISOR MODAL */
+    .visor-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:300; align-items:flex-start; justify-content:center; padding:32px 20px; overflow-y:auto; }
+    .visor-overlay.abierto { display:flex; }
+    .visor-modal { background:#fff; border-radius:12px; width:100%; max-width:860px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    .visor-header { display:flex; align-items:center; gap:12px; padding:14px 20px; background:#1B2B4B; color:#fff; }
+    .visor-header .vtipo { font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; text-transform:uppercase; }
+    .visor-header .vnombre { font-size:14px; font-weight:700; flex:1; }
+    .visor-header .vubicacion { font-size:12px; color:#F0D98B; }
+    .visor-header .vclose { background:none; border:none; color:rgba(255,255,255,.7); font-size:22px; cursor:pointer; line-height:1; padding:0 4px; }
+    .visor-header .vclose:hover { color:#fff; }
+    .visor-nav { display:flex; align-items:center; gap:8px; padding:10px 20px; background:#F9F8F6; border-bottom:1px solid #D9D4C8; font-size:13px; color:#6B7280; }
+    .visor-nav button { background:#fff; border:1px solid #D9D4C8; padding:5px 12px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; }
+    .visor-nav button:hover { background:#F2EFE9; }
+    .visor-nav button:disabled { opacity:.4; cursor:not-allowed; }
+    .visor-nav .vhit-info { margin-left:auto; font-size:12px; color:#1B2B4B; font-weight:600; }
+    .visor-body { padding:24px; max-height:60vh; overflow-y:auto; }
+
+    /* Visor texto (Word/PDF) */
+    .visor-texto { font-family:Georgia,serif; font-size:14px; line-height:1.9; color:#2C2C2C; white-space:pre-wrap; word-break:break-word; }
+    .visor-texto mark { background:#FEF08A; color:#1B2B4B; border-radius:2px; padding:1px 3px; font-weight:700; }
+    .visor-texto .hit-actual { background:#FF9800; color:#fff; border-radius:2px; padding:1px 3px; font-weight:700; outline:2px solid #FF9800; }
+
+    /* Visor tabla (Excel) */
+    .visor-tabla-wrap { overflow-x:auto; }
+    .visor-tabla { border-collapse:collapse; font-size:12px; width:100%; }
+    .visor-tabla th { background:#1B2B4B; color:#fff; padding:6px 10px; text-align:left; font-weight:600; white-space:nowrap; position:sticky; top:0; }
+    .visor-tabla td { padding:5px 10px; border-bottom:1px solid #E5E7EB; white-space:nowrap; vertical-align:top; }
+    .visor-tabla tr:hover td { background:#F9F8F6; }
+    .visor-tabla tr.fila-hit td { background:#FEF9C3; }
+    .visor-tabla tr.fila-hit-actual td { background:#FEF08A; font-weight:700; }
+    .visor-tabla td.celda-hit { color:#991B1B; font-weight:700; }
+    .visor-tabs-hoja { display:flex; gap:4px; padding:10px 20px 0; background:#F9F8F6; border-bottom:1px solid #D9D4C8; overflow-x:auto; }
+    .visor-tab-hoja { padding:6px 14px; border:1px solid #D9D4C8; border-bottom:none; border-radius:6px 6px 0 0; font-size:12px; font-weight:600; cursor:pointer; background:#fff; color:#6B7280; }
+    .visor-tab-hoja.activa { background:#1B2B4B; color:#fff; border-color:#1B2B4B; }
+
+    /* Botón ver en resultados */
+    .btn-ver { display:inline-flex; align-items:center; gap:5px; margin-top:8px; padding:5px 12px; background:#1B2B4B; color:#fff; border:none; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; transition:background .15s; }
+    .btn-ver:hover { background:#253A60; }
+
+    /* ── REVISIÓN DE COINCIDENCIAS (v17) ── */
+    .res-item.fuente-revisada { border-color:#4ADE80; background:#F3FCF6; box-shadow:0 0 0 2px rgba(74,222,128,.15); }
+    .res-item.fuente-revisada.fuente-elegida { border-color:#2D7D46; }
+    .chk-fuente-revisada { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#166534; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:6px; padding:5px 10px; cursor:pointer; white-space:nowrap; }
+    .chk-fuente-revisada input { accent-color:#2D7D46; cursor:pointer; }
+    .chk-coincidencia-revisada { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; color:#166534; cursor:pointer; margin-top:6px; }
+    .chk-coincidencia-revisada input { accent-color:#2D7D46; cursor:pointer; }
+    .res-fragmento.coincidencia-revisada { background:#F0FDF4; border-left-color:#4ADE80; }
+    .res-fragmento.coincidencia-elegida { outline:2px solid #2D7D46; background:#F7FCF8; }
+    .res-hallazgo-acciones { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:8px; }
+    .btn-usar-coincidencia { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; background:#fff; color:#2D7D46; border:1px solid #86EFAC; border-radius:5px; font-size:11px; font-weight:700; cursor:pointer; }
+    .btn-usar-coincidencia:hover { background:#F0FDF4; }
+    .btn-usar-coincidencia.activo { background:#2D7D46; color:#fff; border-color:#2D7D46; }
+    .res-explicacion { font-size:11px; color:#4B5563; background:#F9FAFB; border-radius:5px; padding:5px 9px; margin:6px 0; line-height:1.4; }
+    .res-fragmento mark.mk-cifra { background:#FEF08A; color:#1B2B4B; }
+    .res-fragmento mark.mk-ctx { background:#BFDBFE; color:#1B2B4B; }
+
+    .filtros-revision { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+    .fr-btn { border:1px solid #D9D4C8; background:#fff; color:#6B7280; border-radius:20px; padding:5px 13px; font-size:12px; font-weight:700; cursor:pointer; }
+    .fr-btn:hover { border-color:#9CA3AF; }
+    .fr-btn.activo { background:#1B2B4B; color:#fff; border-color:#1B2B4B; }
+    .resumen-revision { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+    .rr-chip { font-size:11px; font-weight:700; padding:5px 11px; border-radius:20px; background:#F3F4F6; color:#374151; }
+    .rr-chip.rr-pend { background:#FEF9C3; color:#854D0E; }
+    .rr-chip.rr-ok { background:#DCFCE7; color:#166534; }
+
+    .btn-mas-coincidencias { display:block; width:100%; margin-top:8px; padding:8px; background:#F3F4F6; border:1px dashed #D9D4C8; border-radius:6px; font-size:12px; font-weight:700; color:#1B2B4B; cursor:pointer; }
+    .btn-mas-coincidencias:hover { background:#EEF0F5; }
+    .res-fuente-contraida { opacity:.85; }
+    .res-fuente-contraida .res-lista-hallazgos { display:none; }
+    .res-contraer-tog { background:none; border:none; color:#6B7280; font-size:11px; font-weight:700; cursor:pointer; margin-left:auto; }
+
+    /* ── VISOR REDISEÑADO (v17) ── */
+    .visor-overlay.abierto { align-items:center; }
+    .visor-modal { max-width:1040px; }
+    .visor-toolbar { display:flex; align-items:center; gap:10px; padding:8px 20px; background:#F9F8F6; border-bottom:1px solid #D9D4C8; flex-wrap:wrap; }
+    .visor-zoom { display:flex; align-items:center; gap:6px; }
+    .visor-zoom button { background:#fff; border:1px solid #D9D4C8; width:26px; height:26px; border-radius:5px; font-size:14px; font-weight:700; cursor:pointer; }
+    .visor-zoom span { font-size:12px; color:#6B7280; min-width:38px; text-align:center; }
+    .visor-layout { display:flex; gap:0; max-height:70vh; }
+    .visor-principal { flex:1; overflow:auto; padding:20px; background:#EFEDE7; min-width:0; }
+    .visor-panel-lateral { width:270px; flex-shrink:0; border-left:1px solid #D9D4C8; background:#fff; padding:16px; overflow-y:auto; }
+    .visor-panel-lateral h4 { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#1B2B4B; margin-bottom:8px; }
+    .visor-panel-lateral .vp-frag { font-family:Georgia,serif; font-size:12px; line-height:1.6; color:#374151; background:#F9F8F6; border-left:3px solid #C9A84C; padding:8px 10px; border-radius:0 6px 6px 0; margin-bottom:12px; }
+    .visor-panel-lateral .vp-meta { font-size:11px; color:#6B7280; margin-bottom:6px; line-height:1.5; }
+    .visor-panel-lateral .vp-meta strong { color:#1B2B4B; }
+    .pdf-canvas-wrap { position:relative; display:inline-block; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.15); }
+    .pdf-hit-box { position:absolute; background:rgba(255,152,0,.35); outline:2px solid #FF9800; border-radius:2px; pointer-events:none; }
+    .visor-word-html { font-family:Georgia,serif; font-size:14px; line-height:1.8; color:#2C2C2C; background:#fff; padding:24px; box-shadow:0 2px 10px rgba(0,0,0,.1); max-width:760px; margin:0 auto; }
+    .visor-word-html table { border-collapse:collapse; margin:10px 0; }
+    .visor-word-html td, .visor-word-html th { border:1px solid #D9D4C8; padding:5px 9px; font-size:13px; }
+    .visor-word-html mark { background:#FEF08A; padding:1px 2px; border-radius:2px; }
+    .visor-word-html mark.hit-actual { background:#FF9800; color:#fff; font-weight:700; }
+    .visor-linea { display:flex; gap:10px; font-family:'Courier New',monospace; font-size:12px; padding:2px 6px; border-radius:3px; }
+    .visor-linea.linea-hit { background:#FEF9C3; }
+    .visor-linea .ln-num { color:#9CA3AF; min-width:38px; text-align:right; flex-shrink:0; }
+    .visor-linea .ln-txt { white-space:pre-wrap; word-break:break-word; }
+    .visor-etiqueta-estimada { display:inline-block; font-size:10px; font-weight:700; background:#FFFBEB; color:#854D0E; border:1px solid #FDE68A; border-radius:4px; padding:2px 7px; margin-left:6px; }
+    @media (max-width:800px) {
+      .visor-layout { flex-direction:column; max-height:none; }
+      .visor-panel-lateral { width:auto; border-left:none; border-top:1px solid #D9D4C8; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="h-top">
+    <div>
+      <div class="h-marca">Programa Estado de la Nación</div>
+      <div class="h-titulo">Auditoría de Cifras</div>
+    </div>
+    <div class="h-stats">
+      <div class="stat"><div class="stat-n s-v" id="cnt-v">0</div><div class="stat-l">Verificadas</div></div>
+      <div class="stat"><div class="stat-n s-a" id="cnt-a">0</div><div class="stat-l">En revisión</div></div>
+      <div class="stat"><div class="stat-n s-r" id="cnt-r">0</div><div class="stat-l">Con problema</div></div>
+      <div class="stat"><div class="stat-n s-t" id="cnt-t">0</div><div class="stat-l">Total</div></div>
+    </div>
+  </div>
+  <div class="h-prog" id="h-prog">
+    <div class="h-prog-track" id="h-prog-track"></div>
+    <div class="h-prog-lbl" id="h-prog-lbl"></div>
+  </div>
+  <div class="tabs">
+    <button class="tab activo" onclick="irA('fuentes')">① Fuentes <span class="bdg" id="bdg-fuentes">0</span></button>
+    <button class="tab" onclick="irA('revision')">② Revisar cifras <span class="bdg" id="bdg-rev">0</span></button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ① FUENTES -->
+  <div id="vista-fuentes">
+    <div class="card">
+      <h2>Documentos fuente</h2>
+      <p class="desc">Arrastre aquí sus archivos y carpetas — puede mezclar todo. Una vez que vea la lista, presione <strong>Cargar documentos</strong> para que la herramienta los procese.</p>
+
+      <!-- ZONA DRAG & DROP MASIVA -->
+      <div class="zona-drop" id="zona-drop-principal">
+        <input type="file" id="inp-arch-principal" accept=".docx,.pdf,.xlsx,.xls,.html,.htm,.txt,.csv,.tsv,.md,.json,.xml" multiple
+               onchange="agregarACola(this.files)" style="display:none">
+        <input type="file" id="inp-carp-principal" webkitdirectory
+               onchange="agregarACola(this.files)" style="display:none">
+        <div class="zd-icono">📂</div>
+        <div class="zd-titulo">Arrastre aquí sus archivos y carpetas</div>
+        <div class="zd-sub">
+          Puede arrastrar archivos sueltos, carpetas completas, o una mezcla de ambos.<br>
+          Formatos aceptados: Word (.docx) · PDF · Excel (.xlsx/.xls/.csv) · HTML · TXT/MD/JSON/XML
+        </div>
+        <div class="zd-btns">
+          <button class="zd-btn zd-btn-archivos" onclick="event.stopPropagation();document.getElementById('inp-arch-principal').click()">
+            📄 Seleccionar archivos
+          </button>
+          <button class="zd-btn zd-btn-carpeta" onclick="event.stopPropagation();document.getElementById('inp-carp-principal').click()">
+            📁 Seleccionar carpeta
+          </button>
+        </div>
+      </div>
+
+      <!-- COLA: archivos detectados esperando ser procesados -->
+      <div class="cola-wrap" id="cola-wrap">
+        <div class="cola-header">
+          <div>
+            <span class="cola-titulo">Archivos listos para cargar</span>
+            <span class="cola-n" id="cola-n">0</span>
+          </div>
+          <button class="btn-quitar-todas" onclick="limpiarCola()">Limpiar lista</button>
+        </div>
+        <div class="cola-lista" id="cola-lista"></div>
+        <button class="btn-procesar" id="btn-procesar" onclick="procesarCola()">
+          ⚡ Cargar documentos
+        </button>
+      </div>
+
+      <!-- BARRA DE PROGRESO DE PROCESAMIENTO -->
+      <div class="proc-prog" id="proc-prog">
+        <div class="proc-prog-msg" id="proc-msg">Procesando...</div>
+        <div class="proc-prog-track"><div class="proc-prog-fill" id="proc-fill"></div></div>
+        <div class="proc-prog-det" id="proc-det"></div>
+      </div>
+
+      <!-- LISTA DE FUENTES YA PROCESADAS -->
+      <div class="procesadas-wrap" id="procesadas-wrap">
+        <div class="procesadas-header">
+          <div class="procesadas-titulo">
+            ✅ Documentos cargados
+            <span class="procesadas-n" id="procesadas-n">0</span>
+          </div>
+          <button class="btn-quitar-todas" onclick="quitarTodas()">Quitar todas</button>
+        </div>
+        <div class="procesadas-lista" id="procesadas-lista"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:4px;">
+      <button class="btn-p" onclick="irA('revision')">Ir a revisar cifras →</button>
+    </div>
+  </div>
+
+  <!-- ② REVISIÓN -->
+  <div id="vista-revision" style="display:none">
+
+    <!-- Panel de fuentes colapsable -->
+    <div id="panel-fuentes-revision"></div>
+
+    <!-- Panel cifra -->
+    <div class="panel-rev">
+      <h2>Ingresar cifra a verificar</h2>
+      <div class="form2">
+        <div class="campo">
+          <label>Cifra exacta del informe *</label>
+          <input type="text" id="inp-cifra" placeholder="Ej: 40,7% · uno de cada cinco · veintitrés millones · 4.200 dólares · €1,234.50"
+                 onkeydown="if(event.key==='Enter')buscar()">
+        </div>
+        <div class="campo">
+          <label>Capítulo o sección (opcional)</label>
+          <input type="text" id="inp-cap" placeholder="Ej: Capítulo 2 — Educación">
+        </div>
+        <div class="campo form-full">
+          <label>Frase del informe donde aparece la cifra *</label>
+          <button type="button" id="btn-usar-seleccion" class="btn-s" style="display:none;margin-bottom:6px;"
+                  onclick="usarSeleccionWord()">📝 Usar el texto seleccionado en Word</button>
+          <textarea id="inp-ctx" rows="2" placeholder="Ej: La esperanza de vida se sitúa en 80,9 años, sin cambios significativos con respecto al año previo."></textarea>
+        </div>
+      </div>
+      <button class="btn-buscar" onclick="buscar()">🔍 Buscar esta cifra en los documentos fuente</button>
+
+      <div id="zona-resultados" style="display:none">
+        <div class="resultados-busqueda" id="resultados-busqueda"></div>
+        <div class="manual-alertas" id="alertas-manual"></div>
+        <div class="manual-box">
+          <div class="manual-box-titulo">Controles de calidad del Manual PEN</div>
+          <div class="manual-box-desc">Esta sección deja constancia de las comprobaciones adicionales realizadas después de localizar la cifra.</div>
+
+          <details class="manual-ayuda">
+            <summary>ℹ️ ¿Qué significa cada campo y cada control?</summary>
+            <div class="manual-ayuda-contenido">
+              <p><strong>Tipo de fuente o respaldo:</strong> indica de dónde proviene la cifra, por ejemplo una institución oficial, una ponencia, una base de datos o un procesamiento reproducible.</p>
+              <p><strong>Respaldo guardado:</strong> marque cuando guardó el archivo, base, publicación, correo o documento que permite volver a comprobar la cifra.</p>
+              <p><strong>Unidad, período y naturaleza:</strong> marque cuando confirmó que la cifra corresponde a la unidad correcta —personas, colones, millones, hectáreas, porcentaje—, al período indicado y a su tipo —nominal, real, promedio, tasa, variación, entre otros—.</p>
+              <p><strong>Coincidencia con gráfico, cuadro o figura:</strong> marque únicamente cuando existe una visualización relacionada y comprobó que presenta el mismo valor.</p>
+              <p><strong>Coincidencia en otras secciones o capítulos:</strong> marque únicamente cuando la cifra se repite en otros apartados y comprobó que no cambia.</p>
+            </div>
+          </details>
+
+          <div class="manual-nota-aplica"><strong>Importante:</strong> marque solo lo que realmente revisó. Si la cifra no aparece en un gráfico o no se repite en otra sección, esos controles pueden quedar sin marcar.</div>
+
+          <div class="manual-meta">
+            <div class="campo form-full">
+              <label>Tipo de fuente o respaldo</label>
+              <select id="inp-tipo-fuente">
+                <option value="Sin especificar">Sin especificar</option>
+                <option value="Fuente oficial o primaria">Fuente oficial o primaria</option>
+                <option value="Ponencia o informe de investigación">Ponencia o informe de investigación</option>
+                <option value="Base propia o procesamiento reproducible">Base propia o procesamiento reproducible</option>
+                <option value="Publicación, memoria u otro estudio">Publicación, memoria u otro estudio</option>
+                <option value="Otra fuente">Otra fuente</option>
+              </select>
+              <span class="campo-ayuda">Seleccione el origen del dato que utilizó para comprobar la cifra.</span>
+            </div>
+          </div>
+          <div class="manual-checks">
+            <label class="manual-check" title="Marque cuando guardó el archivo o documento que respalda la cifra."><input type="checkbox" id="chk-respaldo"> Respaldo oficial o primario guardado.</label>
+            <label class="manual-check" title="Marque cuando confirmó unidad, período y tipo de cifra."><input type="checkbox" id="chk-unidad"> Unidad, período y naturaleza de la cifra verificados.</label>
+            <label class="manual-check" title="Marque solo si existe una visualización relacionada y comprobó el mismo valor."><input type="checkbox" id="chk-visual"> Coincide con gráfico, cuadro, mapa o figura, si aplica.</label>
+            <label class="manual-check" title="Marque solo si la cifra se repite en otros apartados y comprobó su consistencia."><input type="checkbox" id="chk-interna"> Coincide en otras secciones o capítulos, si aplica.</label>
+          </div>
+        </div>
+        <div class="sem-wrap">
+          <label>Resultado de la verificación *</label>
+          <div class="sem-btns">
+            <button class="sem-btn" data-v="verde"    onclick="selSem(this)">🟢 Verificado — coincide</button>
+            <button class="sem-btn" data-v="amarillo" onclick="selSem(this)">🟡 En revisión — pendiente confirmar</button>
+            <button class="sem-btn" data-v="rojo"     onclick="selSem(this)">🔴 Problema — no coincide o no encontrado</button>
+          </div>
+        </div>
+        <div class="form2" style="margin-top:12px">
+          <div class="campo">
+            <label>Revisor</label>
+            <select id="inp-rev"></select>
+            <div class="rev-agregar">
+              <input type="text" id="inp-nuevo-revisor" placeholder="Escriba un nombre para agregarlo"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();agregarRevisor();}">
+              <button type="button" class="btn-rev-add" onclick="agregarRevisor()">+ Agregar</button>
+            </div>
+            <div class="rev-lista" id="lista-revisores"></div>
+          </div>
+          <div class="campo">
+            <label>Notas (opcional)</label>
+            <input type="text" id="inp-notas" placeholder="Observaciones sobre la verificación">
+          </div>
+        </div>
+        <button class="btn-registrar" onclick="registrar()">✓ Registrar resultado y pasar a la siguiente cifra</button>
+      </div>
+    </div>
+
+    <!-- Filtros y lista -->
+    <div class="filtros">
+      <input type="text" id="busqueda" placeholder="Buscar en registros..." oninput="renderLista()">
+      <select id="fil-sem" onchange="renderLista()">
+        <option value="Todos">Todos los resultados</option>
+        <option value="verde">🟢 Verificadas</option>
+        <option value="amarillo">🟡 En revisión</option>
+        <option value="rojo">🔴 Con problema</option>
+        <option value="pendiente">⚪ Sin marcar</option>
+      </select>
+      <div class="ml">
+        <button class="btn-s" onclick="abrirReporte()">📊 Reporte</button>
+        <button class="btn-s" onclick="exportarExcel()">⬇ Excel</button>
+      </div>
+    </div>
+    <div id="lista"></div>
+  </div>
+
+
+<!-- VISOR DE DOCUMENTOS -->
+<div class="visor-overlay" id="visor-overlay" onclick="if(event.target.id==='visor-overlay')cerrarVisor()">
+  <div class="visor-modal">
+    <div class="visor-header">
+      <span class="vtipo" id="visor-tipo"></span>
+      <span class="vnombre" id="visor-nombre"></span>
+      <span class="vubicacion" id="visor-ubicacion"></span>
+      <button class="vclose" onclick="cerrarVisor()">&#x2715;</button>
+    </div>
+    <div id="visor-tabs-hoja" style="display:none"></div>
+    <div class="visor-toolbar" id="visor-toolbar">
+      <div class="visor-nav" id="visor-nav" style="display:none">
+        <button onclick="navHit(-1)" id="btn-hit-prev">&#8592; Anterior</button>
+        <button onclick="navHit(1)"  id="btn-hit-next">Siguiente &#8594;</button>
+        <span class="vhit-info" id="visor-hit-info"></span>
+      </div>
+      <div class="visor-zoom" id="visor-zoom" style="display:none">
+        <button onclick="zoomVisor(-1)">&#8722;</button>
+        <span id="visor-zoom-lbl">100%</span>
+        <button onclick="zoomVisor(1)">+</button>
+      </div>
+    </div>
+    <div class="visor-layout">
+      <div class="visor-principal" id="visor-body"></div>
+      <div class="visor-panel-lateral" id="visor-panel-lateral"></div>
+    </div>
+  </div>
+</div>
+</main>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="if(event.target.id==='modal')cerrarM()">
+  <div class="modal">
+    <h2>Reporte de Auditoría</h2>
+    <div id="contenido-rep"></div>
+    <div class="modal-btns">
+      <button class="btn-s" onclick="exportarExcel()">⬇ Excel</button>
+      <button class="btn-p" onclick="cerrarM()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+// ── ESTADO ──────────────────────────────────────────────────────────────────
+let fuentes   = [];
+let registros = JSON.parse(localStorage.getItem('en_auditoria') || '[]');
+let revisores = JSON.parse(localStorage.getItem('en_revisores') || '[]');
+if (!Array.isArray(revisores)) revisores = [];
+revisores = revisores
+  .map(x => String(x || '').replace(/\s+/g, ' ').trim())
+  .filter((x, i, arr) => x && arr.findIndex(y => y.toLocaleLowerCase('es') === x.toLocaleLowerCase('es')) === i);
+let expandido = null;
+let semActual = null;
+let contador  = registros.length > 0 ? Math.max(...registros.map(r=>parseInt(r.id))) : 0;
+let ultimasBusquedas = [];
+let fuenteSeleccionada = '';
+let coincidenciaSeleccionada = null; // ubicación exacta elegida dentro de una fuente (v17)
+let cifraNormActual = '';
+let ctxNormActual = '';
+let filtroRevisionActual = 'todas'; // 'todas' | 'pendientes' | 'revisadas'
+let resumenBusquedaActual = { totalCifra: 0, altas: 0, probables: 0, bajas: 0 };
+let alertasManualActual = [];
+
+// ── ESTADO DE REVISIÓN PERSISTENTE (v17) ────────────────────────────────────
+// Recuerda qué fuentes y qué coincidencias ya fueron inspeccionadas por la
+// persona auditora, para la misma cifra + contexto + archivo.
+let estadoRevision = {};
+try { estadoRevision = JSON.parse(localStorage.getItem('en_estado_revision') || '{}'); } catch(e) { estadoRevision = {}; }
+if (!estadoRevision || typeof estadoRevision !== 'object') estadoRevision = {};
+
+function guardarEstadoRevision() {
+  try { localStorage.setItem('en_estado_revision', JSON.stringify(estadoRevision)); } catch(e) {}
+}
+
+// Huella de un archivo: nombre + fecha de última modificación (evita confundir
+// archivos distintos que comparten nombre).
+function huellaDeArchivo(file) {
+  const nombre = file?.name || '';
+  const mod = file?.lastModified || 0;
+  return nombre + '§' + mod;
+}
+
+function normalizarClaveTexto(t) {
+  return normalizarBusqueda(t || '');
+}
+
+// Clave base que identifica de forma única: esta cifra + este contexto + este archivo.
+function claveBaseRevision(cifraNorm, ctxNorm, huella) {
+  return cifraNorm + '§§' + ctxNorm + '§§' + huella;
+}
+
+// Identifica la ubicación concreta de una coincidencia dentro de un archivo.
+function claveUbicacionHallazgo(h) {
+  return [h.pagina ?? '', h.hoja ?? '', h.celda ?? '', h.fila ?? '', h.columna ?? '', h.termino ?? '', h.indice ?? ''].join('|');
+}
+
+function claveFuenteRevisada(cifraNorm, ctxNorm, huella) {
+  return claveBaseRevision(cifraNorm, ctxNorm, huella) + '§§FUENTE';
+}
+
+function claveHallazgoRevisado(cifraNorm, ctxNorm, huella, h) {
+  return claveBaseRevision(cifraNorm, ctxNorm, huella) + '§§H§§' + claveUbicacionHallazgo(h);
+}
+
+function estaFuenteRevisada(cifraNorm, ctxNorm, huella) {
+  return !!estadoRevision[claveFuenteRevisada(cifraNorm, ctxNorm, huella)];
+}
+
+function estaHallazgoRevisado(cifraNorm, ctxNorm, huella, h) {
+  return !!estadoRevision[claveHallazgoRevisado(cifraNorm, ctxNorm, huella, h)];
+}
+
+function marcarFuenteRevisada(cifraNorm, ctxNorm, huella, valor) {
+  estadoRevision[claveFuenteRevisada(cifraNorm, ctxNorm, huella)] = !!valor;
+}
+
+function marcarHallazgoRevisado(cifraNorm, ctxNorm, huella, h, valor) {
+  estadoRevision[claveHallazgoRevisado(cifraNorm, ctxNorm, huella, h)] = !!valor;
+}
+
+// IDs únicos para inputs (evitar conflictos entre los dos paneles)
+let _panelId = 0;
+
+// ── NAVEGACIÓN ───────────────────────────────────────────────────────────────
+function irA(v) {
+  document.getElementById('vista-fuentes').style.display  = v==='fuentes'  ? 'block' : 'none';
+  document.getElementById('vista-revision').style.display = v==='revision' ? 'block' : 'none';
+  document.querySelectorAll('.tab').forEach((t,i)=>
+    t.classList.toggle('activo', ['fuentes','revision'][i]===v)
+  );
+  if (v==='revision') { renderLista(); }
+}
+
+// ── PANEL DE FUENTES (componente reutilizable) ───────────────────────────────
+// Renderiza el panel en el contenedor indicado.
+// colapsable=false → siempre abierto (vista fuentes)
+// colapsable=true  → se puede plegar (vista revisión)
+function renderPanelFuentes(contenedorId, colapsable) {
+  const pid = 'pf-' + (++_panelId);
+  const contenedor = document.getElementById(contenedorId);
+  if (!contenedor) return;
+
+  if (colapsable) {
+    contenedor.innerHTML = `
+    <div class="panel-fuentes">
+      <div class="pf-header" onclick="togglePanel('${pid}')">
+        <div class="pf-header-izq">
+          📂 Documentos fuente cargados
+          <span class="pf-cnt" id="${pid}-cnt">0</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="pf-hint">Haga clic para agregar o quitar fuentes</span>
+          <span class="pf-tog" id="${pid}-tog">▼</span>
+        </div>
+      </div>
+      <div id="${pid}-body" style="display:none">
+        ${renderPanelBody(pid)}
+      </div>
+    </div>`;
+  } else {
+    contenedor.innerHTML = `
+    <div class="panel-fuentes">
+      <div id="${pid}-body" style="display:block">
+        ${renderPanelBody(pid)}
+      </div>
+    </div>`;
+  }
+
+  // Registrar este panel para actualizaciones
+  paneles.push({ pid, colapsable });
+  actualizarPanelLista(pid);
+}
+
+// HTML interno del panel (zonas de carga + lista)
+function renderPanelBody(pid) {
+  return `
+    <div class="pf-body">
+      <div class="pf-zonas">
+        <div class="zona" onclick="document.getElementById('${pid}-f').click()">
+          <input type="file" id="${pid}-f" accept=".docx,.pdf,.xlsx,.xls,.html,.htm,.txt,.csv,.tsv,.md,.json,.xml" multiple
+                 onchange="procesarArchivos(this.files)">
+          <div class="zi">📄</div>
+          <div class="zt">Agregar archivos</div>
+          <div class="zs">Word · PDF · Excel · HTML · texto<br>Ctrl+clic para varios</div>
+        </div>
+        <div class="zona zona-carpeta" onclick="document.getElementById('${pid}-c1').click()">
+          <input type="file" id="${pid}-c1" webkitdirectory
+                 onchange="procesarArchivos(this.files)">
+          <div class="zi">📁</div>
+          <div class="zt">Agregar carpeta</div>
+          <div class="zs">Carga todos los archivos<br>compatibles de la carpeta</div>
+        </div>
+        <div class="zona zona-carpeta" onclick="document.getElementById('${pid}-c2').click()">
+          <input type="file" id="${pid}-c2" webkitdirectory multiple
+                 onchange="procesarArchivos(this.files)">
+          <div class="zi">📁📁</div>
+          <div class="zt">Agregar varias carpetas</div>
+          <div class="zs">Seleccione una carpeta,<br>repita para agregar más</div>
+        </div>
+      </div>
+      <div class="pf-prog" id="${pid}-prog">
+        <div class="pf-prog-msg" id="${pid}-msg">Leyendo archivos...</div>
+        <div class="pf-prog-track"><div class="pf-prog-fill" id="${pid}-fill"></div></div>
+        <div class="pf-prog-detalle" id="${pid}-det"></div>
+      </div>
+      <div id="${pid}-lista-wrap">
+        <div class="pf-lista-header">
+          <span>Cargados: <span id="${pid}-n">0</span> documentos</span>
+          <button class="btn-quitar-todas" onclick="quitarTodas()">Quitar todas</button>
+        </div>
+        <div class="pf-lista" id="${pid}-lista"></div>
+        <div class="pf-vacio" id="${pid}-vacio">
+          Aún no hay documentos cargados. Use las opciones de arriba.
+        </div>
+      </div>
+    </div>`;
+}
+
+// Toggle del panel colapsable
+function togglePanel(pid) {
+  const body = document.getElementById(pid+'-body');
+  const tog  = document.getElementById(pid+'-tog');
+  if (!body) return;
+  const abierto = body.style.display !== 'none';
+  body.style.display = abierto ? 'none' : 'block';
+  if (tog) tog.textContent = abierto ? '▼' : '▲';
+}
+
+// Lista de paneles activos para sincronización
+let paneles = [];
+
+// Actualiza la lista de fuentes en UN panel
+function actualizarPanelLista(pid) {
+  const lista  = document.getElementById(pid+'-lista');
+  const vacio  = document.getElementById(pid+'-vacio');
+  const nEl    = document.getElementById(pid+'-n');
+  const cntEl  = document.getElementById(pid+'-cnt');
+  const wrap   = document.getElementById(pid+'-lista-wrap');
+
+  const n = fuentes.length;
+  if (nEl)   nEl.textContent  = n;
+  if (cntEl) cntEl.textContent = n;
+
+  if (!lista) return;
+
+  if (n === 0) {
+    lista.innerHTML = '';
+    if (vacio) vacio.style.display = 'block';
+    if (wrap)  wrap.querySelector('.pf-lista-header') &&
+      (wrap.querySelector('.pf-lista-header').style.display = 'none');
+    return;
+  }
+
+  if (vacio) vacio.style.display = 'none';
+  if (wrap) {
+    const hdr = wrap.querySelector('.pf-lista-header');
+    if (hdr) hdr.style.display = 'flex';
+  }
+
+  lista.innerHTML = fuentes.map(f => {
+    const tc = claseTipoArchivo(f.tipo);
+    return `<div class="pf-item">
+      <span class="ftipo ${tc}">${f.tipo.toUpperCase()}</span>
+      <span class="pf-item-nombre" title="${esc(f.nombre)}">${esc(f.nombre)}</span>
+      <span class="pf-item-meta">${Math.round(f.texto.length/1000)}k</span>
+      <button class="pf-item-del" onclick="quitarFuente('${f.id}')">&#x2715;</button>
+    </div>`;
+  }).join('');
+}
+
+// Actualiza TODOS los paneles y badges del header
+function sincronizarPaneles() {
+  paneles.forEach(p => actualizarPanelLista(p.pid));
+  const n = fuentes.length;
+  const bf = document.getElementById('bdg-fuentes');
+  if (bf) bf.textContent = n;
+  renderProcesadas();
+}
+
+function quitarFuente(id) {
+  fuentes = fuentes.filter(f=>f.id!==id);
+  sincronizarPaneles();
+}
+
+function quitarTodas() {
+  if (fuentes.length===0) return;
+  if (!confirm('¿Quitar todos los documentos fuente cargados?')) return;
+  fuentes = [];
+  sincronizarPaneles();
+}
+
+// Mostrar/ocultar barra de progreso en TODOS los paneles activos
+function progreso(visible, msg='', pct=0, det='') {
+  paneles.forEach(p => {
+    const el   = document.getElementById(p.pid+'-prog');
+    const fill = document.getElementById(p.pid+'-fill');
+    const msgEl= document.getElementById(p.pid+'-msg');
+    const detEl= document.getElementById(p.pid+'-det');
+    if (!el) return;
+    el.style.display = visible ? 'block' : 'none';
+    if (visible) {
+      if (msgEl) msgEl.textContent    = msg;
+      if (fill)  fill.style.width     = pct + '%';
+      if (detEl) detEl.textContent    = det;
+    }
+  });
+}
+
+// ── CARGA MASIVA: COLA + PROCESO ─────────────────────────────────────────────
+const EXTS_OK = ['docx','pdf','xlsx','xls','html','htm','txt','csv','tsv','md','json','xml'];
+let cola = [];   // archivos File() esperando ser procesados
+
+function filtrarCompatibles(files) {
+  return Array.from(files).filter(f => {
+    const ext = f.name.split('.').pop().toLowerCase();
+    return EXTS_OK.includes(ext) && !f.name.startsWith('._') && !f.name.startsWith('~$');
+  });
+}
+
+// ── DRAG & DROP — registrado con addEventListener para máxima compatibilidad ──
+// Se inicializa al final del script con initDrop()
+
+async function leerEntry(entry, lista) {
+  if (!entry) return;
+  if (entry.isFile) {
+    await new Promise((res) => {
+      entry.file(f => { lista.push(f); res(); }, () => res());
+    });
+  } else if (entry.isDirectory) {
+    const reader = entry.createReader();
+    // readEntries devuelve max 100 por llamada — loop hasta vacío
+    const leerBatch = () => new Promise((res) => {
+      reader.readEntries(entries => res(entries), () => res([]));
+    });
+    let batch;
+    do {
+      batch = await leerBatch();
+      await Promise.all(batch.map(e => leerEntry(e, lista)));
+    } while (batch.length > 0);
+  }
+}
+
+function initDrop() {
+  const zona = document.getElementById('zona-drop-principal');
+  if (!zona) return;
+
+  // Prevenir comportamiento por defecto del navegador en toda la página
+  // (sin esto el navegador abre el archivo al soltarlo)
+  ['dragenter','dragover','dragleave','drop'].forEach(ev => {
+    document.addEventListener(ev, e => e.preventDefault(), false);
+  });
+
+  zona.addEventListener('dragenter', e => {
+    e.preventDefault();
+    zona.classList.add('drag-over');
+  });
+
+  zona.addEventListener('dragover', e => {
+    e.preventDefault();
+    zona.classList.add('drag-over');
+  });
+
+  zona.addEventListener('dragleave', e => {
+    e.preventDefault();
+    // Solo quitar si el mouse salió realmente de la zona (no de un hijo)
+    if (!zona.contains(e.relatedTarget)) {
+      zona.classList.remove('drag-over');
+    }
+  });
+
+  zona.addEventListener('drop', async e => {
+    e.preventDefault();
+    e.stopPropagation();
+    zona.classList.remove('drag-over');
+
+    const archivos = [];
+    const dt    = e.dataTransfer;
+    const items = dt.items;
+
+    if (items && items.length > 0) {
+      const entries = [];
+      for (const item of items) {
+        const entry = (item.getAsEntry && item.getAsEntry())
+                   || (item.webkitGetAsEntry && item.webkitGetAsEntry());
+        if (entry) entries.push(entry);
+      }
+
+      if (entries.length > 0) {
+        await Promise.all(entries.map(entry => leerEntry(entry, archivos)));
+      } else {
+        // Sin FileSystem API — archivos planos solamente
+        for (const item of items) {
+          const f = item.getAsFile && item.getAsFile();
+          if (f) archivos.push(f);
+        }
+      }
+    }
+
+    // Fallback: dataTransfer.files (no soporta carpetas pero funciona siempre)
+    if (archivos.length === 0 && dt.files && dt.files.length > 0) {
+      for (const f of dt.files) archivos.push(f);
+    }
+
+    agregarACola(archivos);
+  });
+}
+
+// Agregar archivos a la cola de espera
+function agregarACola(filesRaw) {
+  const nuevos = filtrarCompatibles(filesRaw);
+  if (nuevos.length === 0) return;
+
+  // Evitar duplicados por nombre
+  const nombresExistentes = new Set([...cola.map(f=>f.name), ...fuentes.map(f=>f.nombre)]);
+  const sinDuplicados = nuevos.filter(f => !nombresExistentes.has(f.name));
+
+  cola.push(...sinDuplicados);
+  renderCola();
+}
+
+function renderCola() {
+  const wrap  = document.getElementById('cola-wrap');
+  const lista = document.getElementById('cola-lista');
+  const nEl   = document.getElementById('cola-n');
+  if (!wrap) return;
+
+  if (cola.length === 0) {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  wrap.style.display = 'block';
+  if (nEl) nEl.textContent = cola.length;
+
+  lista.innerHTML = cola.map((f,i) => {
+    const ext = f.name.split('.').pop().toLowerCase();
+    const tc  = claseTipoArchivo(ext);
+    return `<div class="cola-item">
+      <span class="ftipo ${tc}">${ext.toUpperCase()}</span>
+      <span class="cola-item-nombre" title="${esc(f.name)}">${esc(f.name)}</span>
+      <button class="cola-item-del" onclick="quitarDeCola(${i})">&#x2715;</button>
+    </div>`;
+  }).join('');
+}
+
+function quitarDeCola(i) {
+  cola.splice(i, 1);
+  renderCola();
+}
+
+function limpiarCola() {
+  cola = [];
+  renderCola();
+}
+
+// Procesar todos los archivos de la cola
+async function procesarCola() {
+  if (cola.length === 0) return;
+
+  const btn = document.getElementById('btn-procesar');
+  if (btn) btn.disabled = true;
+
+  const total = cola.length;
+  const prog  = document.getElementById('proc-prog');
+  const fill  = document.getElementById('proc-fill');
+  const msg   = document.getElementById('proc-msg');
+  const det   = document.getElementById('proc-det');
+  if (prog) prog.style.display = 'block';
+
+  let procesados = 0;
+  const errores  = [];
+
+  for (let i=0; i<cola.length; i++) {
+    const file = cola[i];
+    const ext  = file.name.split('.').pop().toLowerCase();
+    const pct  = Math.round(((i+1)/total)*100);
+    if (msg)  msg.textContent  = `Procesando ${i+1} de ${total} archivos...`;
+    if (fill) fill.style.width = pct + '%';
+    if (det)  det.textContent  = file.name;
+    await new Promise(r=>setTimeout(r,10));
+
+    try {
+      let resultado;
+      if (ext==='docx')                         resultado = await leerDocx(file);
+      else if (ext==='pdf')                     resultado = await leerPdf(file);
+      else if (ext==='xlsx'||ext==='xls')       resultado = await leerExcel(file);
+      else if (ext==='html'||ext==='htm')       resultado = await leerHtml(file);
+      else if (['txt','csv','tsv','md','json','xml'].includes(ext)) resultado = await leerTextoPlano(file);
+      else continue;
+
+      fuentes.push({
+        id:     'f-' + Date.now() + '-' + i,
+        nombre: file.name,
+        tipo:   ext==='xls' ? 'xlsx' : ext,
+        huella: huellaDeArchivo(file),
+        archivoOriginal: (ext==='pdf' || ext==='docx') ? file : null,
+        ...resultado
+      });
+      procesados++;
+    } catch(err) {
+      console.warn('Error leyendo', file.name, err);
+      errores.push(file.name);
+    }
+  }
+
+  // Limpiar cola y actualizar UI
+  cola = [];
+  if (prog) prog.style.display = 'none';
+  if (btn)  btn.disabled = false;
+  renderCola();
+  renderProcesadas();
+  sincronizarPaneles();
+
+  if (errores.length > 0) {
+    console.warn('No se pudieron leer:', errores);
+  }
+}
+
+// Renderizar lista de fuentes ya procesadas en la vista principal
+function renderProcesadas() {
+  const wrap  = document.getElementById('procesadas-wrap');
+  const lista = document.getElementById('procesadas-lista');
+  const nEl   = document.getElementById('procesadas-n');
+  if (!wrap) return;
+
+  if (fuentes.length === 0) {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  wrap.style.display = 'block';
+  if (nEl) nEl.textContent = fuentes.length;
+
+  lista.innerHTML = fuentes.map(f => {
+    const tc = claseTipoArchivo(f.tipo);
+    return `<div class="proc-item">
+      <span class="ftipo ${tc}">${f.tipo.toUpperCase()}</span>
+      <span class="proc-item-nombre" title="${esc(f.nombre)}">${esc(f.nombre)}</span>
+      <span class="proc-item-meta">${Math.round(f.texto.length/1000)}k</span>
+      <button class="proc-item-del" onclick="quitarFuente('${f.id}');renderProcesadas()">&#x2715;</button>
+    </div>`;
+  }).join('');
+}
+
+// Compatibilidad: procesarArchivos sigue usándose desde el panel colapsable en revisión
+async function procesarArchivos(files) {
+  agregarACola(files);
+}
+
+// Limpiar tabla de contenido antes de indexar
+function limpiarTDC(texto) {
+  return texto.split('\n').filter(l => {
+    const t = l.trim();
+    if (/^.{0,120}[.\u00b7\-\s]{3,}\s*\d{1,4}\s*$/.test(t)) return false;
+    if (/^(cap[íi]tulo|secci[oó]n|parte|anexo|cuadro|figura|gr[aá]fico)[\s\w\d.,\-]*[.\u00b7]{2,}\s*\d{1,4}\s*$/i.test(t)) return false;
+    return true;
+  }).join('\n');
+}
+
+function dividirEnSecciones(texto) {
+  const TAM = 3000;
+  const secciones = [];
+  for (let i=0; i<texto.length; i+=TAM) {
+    secciones.push({ n: Math.floor(i/TAM)+1, texto: texto.slice(i, i+TAM) });
+  }
+  return secciones;
+}
+
+async function leerDocx(file) {
+  const buf = await file.arrayBuffer();
+  const res = await mammoth.extractRawText({arrayBuffer: buf});
+  const texto = limpiarTDC(res.value);
+  return { texto, paginas: dividirEnSecciones(texto) };
+}
+
+async function leerPdf(file) {
+  if (typeof pdfjsLib === 'undefined') throw new Error('PDF.js no disponible');
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  let texto = '';
+  const paginas = [];
+  for (let i=1; i<=pdf.numPages; i++) {
+    const page   = await pdf.getPage(i);
+    const content= await page.getTextContent();
+    const txtPag = limpiarTDC(content.items.map(item => item.str + (item.hasEOL ? '\n' : ' ')).join(''));
+    paginas.push({ n: i, texto: txtPag });
+    texto += txtPag + '\n';
+  }
+  return { texto, paginas };
+}
+
+async function leerExcel(file) {
+  const buf = await file.arrayBuffer();
+  const wb  = XLSX.read(buf, {
+    type: 'array',
+    cellText: true,
+    cellNF: true,
+    cellFormula: true,
+    cellDates: true
+  });
+
+  let texto = '';
+  const paginas = [];
+  const hojas = {};
+
+  wb.SheetNames.forEach((name, i) => {
+    const ws = wb.Sheets[name];
+
+    // raw:false conserva lo que la persona ve en Excel: 62,0%, 1.234,5, fechas, etc.
+    const data = XLSX.utils.sheet_to_json(ws, {
+      header: 1,
+      defval: '',
+      raw: false,
+      blankrows: true
+    });
+    hojas[name] = data;
+
+    const celdas = [];
+    const filasTexto = [];
+    const rango = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : null;
+
+    if (rango) {
+      for (let r = rango.s.r; r <= rango.e.r; r++) {
+        const partesFila = [];
+
+        for (let c = rango.s.c; c <= rango.e.c; c++) {
+          const direccion = XLSX.utils.encode_cell({ r, c });
+          const celda = ws[direccion];
+
+          if (!celda || celda.v === undefined || celda.v === null || celda.v === '') {
+            partesFila.push('');
+            continue;
+          }
+
+          const mostrado = obtenerTextoCeldaExcel(celda);
+          partesFila.push(mostrado);
+
+          celdas.push({
+            direccion,
+            fila: r,
+            columna: c,
+            mostrado,
+            valorRaw: celda.v,
+            tipoCelda: celda.t || '',
+            formato: celda.z || '',
+            formula: celda.f ? '=' + celda.f : '',
+            candidatos: crearCandidatosCeldaExcel(celda, mostrado)
+          });
+        }
+
+        filasTexto[r] = partesFila.join(' | ');
+      }
+    }
+
+    const textoHoja = filasTexto.filter(x => x !== undefined).join('\n');
+    paginas.push({
+      n: i + 1,
+      texto: textoHoja,
+      hoja: name,
+      celdas,
+      filasTexto
+    });
+    texto += '### Hoja: ' + name + '\n' + textoHoja + '\n';
+  });
+
+  return { texto, paginas, hojas };
+}
+
+function obtenerTextoCeldaExcel(celda) {
+  if (!celda) return '';
+
+  if (celda.w !== undefined && celda.w !== null && String(celda.w).trim() !== '') {
+    return String(celda.w);
+  }
+
+  try {
+    const formateado = XLSX.utils.format_cell(celda);
+    if (formateado !== undefined && formateado !== null && String(formateado).trim() !== '') {
+      return String(formateado);
+    }
+  } catch (e) {}
+
+  if (celda.v instanceof Date && !Number.isNaN(celda.v.getTime())) {
+    return celda.v.toLocaleDateString('es-CR');
+  }
+
+  return String(celda.v ?? '');
+}
+
+function crearCandidatosCeldaExcel(celda, mostrado) {
+  const candidatos = [];
+  const vistos = new Set();
+
+  const agregar = (texto, tipo) => {
+    const t = String(texto ?? '').trim();
+    if (!t) return;
+    const clave = tipo + '|' + t;
+    if (vistos.has(clave)) return;
+    vistos.add(clave);
+    candidatos.push({ texto: t, tipo });
+  };
+
+  agregar(mostrado, 'excel_formato_visible');
+
+  if (typeof celda.v === 'number' && Number.isFinite(celda.v)) {
+    const bruto = String(celda.v);
+    agregar(bruto, 'excel_valor_crudo');
+    agregar(bruto.replace('.', ','), 'excel_valor_crudo');
+
+    // Variantes seguras para valores que Excel guarda con muchos decimales binarios.
+    for (const d of [0, 1, 2, 3, 4, 6]) {
+      const fijo = celda.v.toFixed(d).replace(/0+$/, '').replace(/[.,]$/, '');
+      agregar(fijo, 'excel_valor_crudo');
+      agregar(fijo.replace('.', ','), 'excel_valor_crudo');
+    }
+  }
+
+  if (celda.f) agregar('=' + celda.f, 'excel_formula');
+  return candidatos;
+}
+
+function contextoSugierePorcentaje(contexto, objetivo) {
+  if (objetivo?.porcentaje) return true;
+  const s = String(contexto || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  return /%|por\s+ciento|porcent|proporcion|tasa|variacion|reduj|reducc|disminu|aument|increment|creci|descend|caida|participacion/.test(s);
+}
+
+function valoresNumericosObjetivo(objetivo) {
+  if (!objetivo || objetivo.tipo !== 'numero') return [];
+  return [...objetivo.formas]
+    .map(x => Number(x))
+    .filter(Number.isFinite)
+    .map(Math.abs);
+}
+
+function casiIguales(a, b) {
+  const escala = Math.max(1, Math.abs(a), Math.abs(b));
+  return Math.abs(a - b) <= Math.max(1e-9, escala * 1e-8);
+}
+
+// Convierte un índice de columna base-cero (SheetJS) a la letra de Excel (A, B, ..., AA...).
+function colALetra(idx0) {
+  let n = idx0 + 1, s = '';
+  while (n > 0) {
+    const r = (n - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s || 'A';
+}
+
+// El contexto de una celda de Excel no es solo su valor: incluye el nombre de
+// la hoja, el encabezado de su columna, las primeras columnas descriptivas de
+// la fila (etiquetas) y las filas vecinas.
+function construirContextoExcel(pagina, fila, columna, radio = 2) {
+  const lineas = pagina.filasTexto || [];
+  const celdas = pagina.celdas || [];
+  const partes = [];
+
+  if (pagina.hoja) partes.push('Hoja ' + pagina.hoja);
+
+  if (fila !== 0) {
+    const headerCell = celdas.find(c => c.fila === 0 && c.columna === columna);
+    if (headerCell && headerCell.mostrado) partes.push('Encabezado de columna: ' + headerCell.mostrado);
+  }
+
+  const descriptivas = celdas
+    .filter(c => c.fila === fila && c.columna < 2 && c.columna !== columna && c.mostrado)
+    .map(c => c.mostrado);
+  if (descriptivas.length) partes.push(descriptivas.join(' · '));
+
+  const inicio = Math.max(0, fila - radio);
+  const fin = Math.min(lineas.length - 1, fila + radio);
+  for (let i = inicio; i <= fin; i++) {
+    if (lineas[i] && lineas[i].trim()) partes.push(lineas[i]);
+  }
+  return partes.join(' · ');
+}
+
+function buscarCoincidenciasExcel(pagina, objetivo, permitirEscalaPorcentual) {
+  const resultados = [];
+  const valoresObjetivo = valoresNumericosObjetivo(objetivo);
+
+  for (const celda of (pagina.celdas || [])) {
+    let coincidencia = null;
+
+    // 1) Buscar primero en el valor que Excel muestra y luego en el valor crudo.
+    for (const candidato of (celda.candidatos || [])) {
+      const hallados = buscarCoincidenciasCifra(candidato.texto, objetivo);
+      if (!hallados.length) continue;
+
+      const h = hallados[0];
+      coincidencia = {
+        termino: celda.mostrado || h.termino || candidato.texto,
+        tipoCoincidencia: candidato.tipo === 'excel_formato_visible'
+          ? 'excel_formato_visible'
+          : candidato.tipo === 'excel_formula'
+            ? 'excel_formula'
+            : 'excel_valor_crudo'
+      };
+      break;
+    }
+
+    // 2) Caso clave: Excel puede guardar 62,0% como 0,62.
+    //    También funciona cuando la celda muestra 0,62 pero el contexto indica porcentaje.
+    if (!coincidencia && permitirEscalaPorcentual && objetivo.tipo === 'numero' &&
+        typeof celda.valorRaw === 'number' && Number.isFinite(celda.valorRaw)) {
+      const signoCelda = celda.valorRaw < 0;
+      if (signoCelda === objetivo.negativo) {
+        const valorEscalado = Math.abs(celda.valorRaw) * 100;
+        const coincideEscala = valoresObjetivo.some(v => casiIguales(valorEscalado, v));
+        if (coincideEscala) {
+          coincidencia = {
+            termino: celda.mostrado || String(celda.valorRaw),
+            tipoCoincidencia: 'excel_decimal_porcentaje'
+          };
+        }
+      }
+    }
+
+    if (!coincidencia) continue;
+
+    const fragmentoFila = (pagina.filasTexto || [])[celda.fila] || coincidencia.termino;
+    resultados.push({
+      indice: 0,
+      largo: coincidencia.termino.length,
+      termino: coincidencia.termino,
+      tipoCoincidencia: coincidencia.tipoCoincidencia,
+      fragmento: fragmentoFila,
+      bloqueContextual: construirContextoExcel(pagina, celda.fila, celda.columna, 2),
+      celda: celda.direccion,
+      fila: celda.fila,
+      columna: celda.columna
+    });
+  }
+
+  return resultados;
+}
+
+async function leerHtml(file) {
+  const bruto = await file.text();
+  const doc = new DOMParser().parseFromString(bruto, 'text/html');
+  doc.querySelectorAll('script,style,noscript,svg,canvas').forEach(el => el.remove());
+  const texto = limpiarTDC((doc.body?.innerText || doc.body?.textContent || doc.documentElement?.textContent || '')
+    .replace(/\u00a0/g, ' '));
+  const htmlBruto = doc.body ? doc.body.innerHTML : '';
+  return { texto, paginas: dividirEnSecciones(texto), htmlBruto };
+}
+
+async function leerTextoPlano(file) {
+  let texto = await file.text();
+  // Quitar BOM y normalizar saltos de línea, sin destruir la estructura del archivo.
+  texto = limpiarTDC(texto.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n'));
+  return { texto, paginas: dividirEnSecciones(texto) };
+}
+
+function claseTipoArchivo(tipo) {
+  const t = String(tipo || '').toLowerCase();
+  if (t === 'pdf') return 'ft-pdf';
+  if (t === 'xlsx' || t === 'xls') return 'ft-xlsx';
+  if (t === 'html' || t === 'htm') return 'ft-html';
+  if (t === 'csv' || t === 'tsv') return 'ft-csv';
+  if (['txt','md','json','xml'].includes(t)) return 'ft-txt';
+  return 'ft-docx';
+}
+
+// ── BÚSQUEDA ROBUSTA ─────────────────────────────────────────────────────────
+// La búsqueda tiene dos componentes independientes:
+// 1) equivalencia real de la cifra, incluyendo números, porcentajes y razones como «1 de cada 5»;
+// 2) similitud del contexto, para ordenar y clasificar los resultados sin ocultar coincidencias útiles.
+function buscar() {
+  const cifra = document.getElementById('inp-cifra').value.trim();
+  const ctx   = document.getElementById('inp-ctx').value.trim();
+  const cap   = document.getElementById('inp-cap').value.trim();
+  if (!cifra) { alert('Ingrese la cifra antes de buscar.'); return; }
+  if (!ctx)   { alert('Ingrese el contexto donde aparece la cifra.'); return; }
+  if (fuentes.length===0) {
+    alert('No hay documentos fuente cargados.\nVaya al panel de fuentes y cargue los documentos primero.');
+    return;
+  }
+
+  const cifraObjetivo = analizarCifra(cifra);
+  if (!cifraObjetivo || cifraObjetivo.formas.size === 0) {
+    alert('No fue posible interpretar la cifra. Puede usar números, números en palabras, proporciones o monedas; por ejemplo: -44%, uno de cada cinco, veintitrés millones, 4.200 colones o US$1,234.50.');
+    return;
+  }
+
+  document.querySelectorAll('.sem-btn').forEach(b=>b.className='sem-btn');
+  semActual = null;
+  ultimasBusquedas = [];
+  fuenteSeleccionada = '';
+  resumenBusquedaActual = { totalCifra: 0, altas: 0, probables: 0, bajas: 0 };
+
+  // Permite interpretar 0,62 almacenado en Excel como 62%, pero solo cuando
+  // la cifra o su frase realmente sugieren que se trata de un porcentaje/tasa.
+  const permitirEscalaPorcentual = contextoSugierePorcentaje(ctx, cifraObjetivo);
+
+  for (const fuente of fuentes) {
+    const hallazgos = [];
+    const vistos = new Set();
+
+    for (const pag of fuente.paginas) {
+      const esExcel = fuente.tipo === 'xlsx' || fuente.tipo === 'xls';
+      const coincidencias = esExcel
+        ? buscarCoincidenciasExcel(pag, cifraObjetivo, permitirEscalaPorcentual)
+        : buscarCoincidenciasCifra(pag.texto, cifraObjetivo);
+
+      for (const coin of coincidencias) {
+        const clave = `${pag.n}|${coin.celda || ''}|${coin.indice}|${coin.termino}`;
+        if (vistos.has(clave)) continue;
+        vistos.add(clave);
+
+        const bloque = coin.bloqueContextual ||
+          extraerBloqueContextual(pag.texto, coin.indice, coin.largo, 700);
+        const encabezadoCercano = esExcel ? null : encontrarEncabezadoCercano(pag.texto, coin.indice);
+        const evaluacion = evaluarCoincidenciaContextual({
+          contexto: ctx, capitulo: cap, bloque, cifra,
+          encabezado: encabezadoCercano, nombreHoja: pag.hoja || null
+        });
+
+        // Cuando la única similitud consiste en los mismos dígitos sin separador
+        // (por ejemplo 40,7 frente a 407), exigimos contexto suficiente para evitar falsos positivos.
+        if (coin.tipoCoincidencia === 'separador_omitido' && evaluacion.puntaje < 0.32) continue;
+        if (coin.tipoCoincidencia === 'numero_palabras_ambiguo' && evaluacion.puntaje < 0.62) continue;
+        if (coin.tipoCoincidencia === 'moneda_omitida' && evaluacion.puntaje < 0.32) continue;
+
+        const ini = Math.max(0, coin.indice - 260);
+        const fin = Math.min(pag.texto.length, coin.indice + coin.largo + 260);
+        const fragmento = coin.fragmento ||
+          pag.texto.slice(ini, fin).replace(/\s+/g, ' ').trim();
+
+        const nivel = evaluacion.puntaje >= 0.70 ? 'alta'
+                    : evaluacion.puntaje >= 0.45 ? 'probable'
+                    : evaluacion.puntaje >= 0.20 ? 'debil'
+                    : 'solo_cifra';
+
+        hallazgos.push({
+          fragmento,
+          pagina: pag.n,
+          hoja: pag.hoja || null,
+          termino: coin.termino,
+          tipoCoincidencia: coin.tipoCoincidencia,
+          puntaje: evaluacion.puntaje,
+          palabrasCoincidentes: evaluacion.coincidentes,
+          totalPalabrasContexto: evaluacion.total,
+          explicacion: evaluacion.explicacion,
+          palabrasResaltar: evaluacion.palabrasResaltar || [],
+          nivel,
+          celda: coin.celda || null,
+          fila: Number.isInteger(coin.fila) ? coin.fila : null,
+          columna: Number.isInteger(coin.columna) ? coin.columna : null,
+          indice: coin.indice
+        });
+
+        resumenBusquedaActual.totalCifra++;
+        if (nivel === 'alta') resumenBusquedaActual.altas++;
+        else if (nivel === 'probable') resumenBusquedaActual.probables++;
+        else resumenBusquedaActual.bajas++;
+      }
+    }
+
+    hallazgos.sort((a,b) => b.puntaje - a.puntaje);
+    if (hallazgos.length > 0) {
+      // Se muestran TODAS las coincidencias encontradas (sin truncar en silencio).
+      // La interfaz decide cuántas mostrar de una vez mediante "Mostrar más coincidencias".
+      ultimasBusquedas.push({ fuente, hallazgos, aparicionesCifra: hallazgos.length, mostrarTodas: false });
+    }
+  }
+
+  // Ordenar documentos por la mejor coincidencia contextual encontrada.
+  ultimasBusquedas.sort((a,b) => (b.hallazgos[0]?.puntaje || 0) - (a.hallazgos[0]?.puntaje || 0));
+
+  // Recuperar el estado de revisión ya guardado para esta cifra + contexto + archivo.
+  cifraNormActual = normalizarClaveTexto(cifra);
+  ctxNormActual = normalizarClaveTexto(ctx);
+  coincidenciaSeleccionada = null;
+  for (const r of ultimasBusquedas) {
+    const huella = r.fuente.huella || r.fuente.nombre;
+    for (const h of r.hallazgos) {
+      h._revisada = estaHallazgoRevisado(cifraNormActual, ctxNormActual, huella, h);
+    }
+    r._revisada = estaFuenteRevisada(cifraNormActual, ctxNormActual, huella) || (r.hallazgos.length>0 && r.hallazgos.every(h=>h._revisada));
+  }
+
+  // Si solo aparece en un documento, se selecciona automáticamente.
+  // Cuando hay varios, la persona debe escoger uno para evitar exportarlos todos.
+  fuenteSeleccionada = ultimasBusquedas.length === 1
+    ? ultimasBusquedas[0].fuente.nombre
+    : (ultimasBusquedas.length === 0 ? 'No encontrada' : '');
+
+  filtroRevisionActual = 'todas';
+  renderResultados(cifra, ultimasBusquedas, resumenBusquedaActual);
+  renderAlertasManual(cifra, ctx, cifraObjetivo);
+  document.getElementById('zona-resultados').style.display = 'block';
+  document.getElementById('zona-resultados').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function normalizarSignos(texto) {
+  return String(texto || '')
+    .normalize('NFKC')
+    .replace(/[−–—‑‒﹣－]/g, '-')
+    .replace(/[％]/g, '%')
+    .replace(/[⁄]/g, '/')
+    .replace(/[\u00A0\u202F]/g, ' ')
+    .replace(/\u00AD/g, '');
+}
+
+function normalizarBusqueda(texto) {
+  return normalizarSignos(texto)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9%]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizarNumeroPalabra(texto) {
+  return normalizarSignos(texto)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[-–—]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function simplificarFormaNumerica(forma) {
+  let f = String(forma || '');
+  if (!f.includes('.')) return f.replace(/^0+(?=\d)/, '') || '0';
+  let [entero, decimal=''] = f.split('.');
+  entero = entero.replace(/^0+(?=\d)/, '') || '0';
+  decimal = decimal.replace(/0+$/, '');
+  return decimal ? `${entero}.${decimal}` : entero;
+}
+
+function agregarForma(formas, forma) {
+  if (forma === null || forma === undefined || forma === '') return;
+  const f = simplificarFormaNumerica(String(forma));
+  formas.add(f);
+}
+
+function formasCanonicasNumero(numeroBruto) {
+  let n = normalizarSignos(numeroBruto)
+    .replace(/[\s'’]/g, '')
+    .replace(/[^0-9.,]/g, '');
+  const formas = new Set();
+  if (!n || !/\d/.test(n)) return formas;
+
+  const soloDigitos = n.replace(/[.,]/g, '').replace(/^0+(?=\d)/, '') || '0';
+  const puntos = (n.match(/\./g) || []).length;
+  const comas  = (n.match(/,/g) || []).length;
+
+  if (puntos === 0 && comas === 0) {
+    agregarForma(formas, soloDigitos);
+    return formas;
+  }
+
+  if (puntos > 0 && comas > 0) {
+    const posP = n.lastIndexOf('.');
+    const posC = n.lastIndexOf(',');
+    const decimal = posP > posC ? '.' : ',';
+    const pos = n.lastIndexOf(decimal);
+    const entero = n.slice(0, pos).replace(/[.,]/g, '').replace(/^0+(?=\d)/, '') || '0';
+    const dec = n.slice(pos + 1).replace(/[.,]/g, '');
+    if (dec) agregarForma(formas, entero + '.' + dec);
+    agregarForma(formas, soloDigitos);
+    return formas;
+  }
+
+  const sep = puntos ? '.' : ',';
+  const partes = n.split(sep);
+  const ultima = partes[partes.length - 1];
+
+  if (partes.length === 2) {
+    const entero = partes[0].replace(/^0+(?=\d)/, '') || '0';
+    if (ultima.length === 1 || ultima.length === 2) {
+      agregarForma(formas, entero + '.' + ultima);
+    } else if (ultima.length === 3) {
+      // Un solo separador con tres dígitos es ambiguo: 1.234 puede ser 1234 o 1,234.
+      agregarForma(formas, soloDigitos);
+      agregarForma(formas, entero + '.' + ultima);
+    } else {
+      agregarForma(formas, soloDigitos);
+    }
+  } else {
+    const gruposMiles = partes.slice(1).every(p => p.length === 3);
+    if (gruposMiles) {
+      agregarForma(formas, soloDigitos);
+    } else if (ultima.length > 0) {
+      const entero = partes.slice(0, -1).join('').replace(/^0+(?=\d)/, '') || '0';
+      agregarForma(formas, entero + '.' + ultima);
+    }
+  }
+  return formas;
+}
+
+function detectarMoneda(texto) {
+  const original = normalizarSignos(texto);
+  const s = normalizarNumeroPalabra(original);
+  if (/₡|\bcrc\b|\bcolones?\b/.test(s)) return 'CRC';
+  if (/us\$|\busd\b|\bdolares?\b|\$/.test(s)) return 'USD';
+  if (/€|\beur\b|\beuros?\b/.test(s)) return 'EUR';
+  return null;
+}
+
+function etiquetaMoneda(moneda) {
+  return moneda === 'CRC' ? 'colones' : moneda === 'USD' ? 'dólares' : moneda === 'EUR' ? 'euros' : '';
+}
+
+function factorEscalaNumeral(texto) {
+  const s = normalizarNumeroPalabra(texto);
+  if (/\b(?:billones?|billon)\b/.test(s)) return 1e12;
+  if (/\bmil\s+millones?\b/.test(s)) return 1e9;
+  if (/\bmillones?|millon\b/.test(s)) return 1e6;
+  if (/\bmil(?:es)?\b/.test(s)) return 1e3;
+  return 1;
+}
+
+const NUMEROS_PALABRA = {
+  cero:0, un:1, uno:1, una:1, dos:2, tres:3, cuatro:4, cinco:5,
+  seis:6, siete:7, ocho:8, nueve:9, diez:10, once:11, doce:12,
+  trece:13, catorce:14, quince:15, dieciseis:16, diecisiete:17,
+  dieciocho:18, diecinueve:19, veinte:20, veintiuno:21, veintiuna:21,
+  veintidos:22, veintitres:23, veinticuatro:24, veinticinco:25,
+  veintiseis:26, veintisiete:27, veintiocho:28, veintinueve:29,
+  treinta:30, cuarenta:40, cincuenta:50, sesenta:60, setenta:70,
+  ochenta:80, noventa:90,
+  cien:100, ciento:100, doscientos:200, doscientas:200,
+  trescientos:300, trescientas:300, cuatrocientos:400, cuatrocientas:400,
+  quinientos:500, quinientas:500, seiscientos:600, seiscientas:600,
+  setecientos:700, setecientas:700, ochocientos:800, ochocientas:800,
+  novecientos:900, novecientas:900
+};
+
+const UNIDADES_PALABRA = {
+  cero:0, un:1, uno:1, una:1, dos:2, tres:3, cuatro:4, cinco:5,
+  seis:6, siete:7, ocho:8, nueve:9
+};
+
+const TOKENS_NUMERO_PALABRA = new Set([
+  ...Object.keys(NUMEROS_PALABRA), 'y', 'coma', 'punto', 'mil', 'miles',
+  'millon', 'millones', 'billon', 'billones', 'menos'
+]);
+
+function parseEnteroPalabras(tokens) {
+  let total = 0;
+  let actual = 0;
+  let vio = false;
+
+  for (const token of tokens) {
+    if (!token || token === 'y') continue;
+    if (Object.prototype.hasOwnProperty.call(NUMEROS_PALABRA, token)) {
+      actual += NUMEROS_PALABRA[token];
+      vio = true;
+      continue;
+    }
+    if (token === 'mil' || token === 'miles') {
+      actual = actual || 1;
+      total += actual * 1000;
+      actual = 0;
+      vio = true;
+      continue;
+    }
+    if (token === 'millon' || token === 'millones') {
+      const base = total + actual || 1;
+      total = base * 1e6;
+      actual = 0;
+      vio = true;
+      continue;
+    }
+    if (token === 'billon' || token === 'billones') {
+      const base = total + actual || 1;
+      total = base * 1e12;
+      actual = 0;
+      vio = true;
+      continue;
+    }
+    return null;
+  }
+  return vio ? total + actual : null;
+}
+
+function parseDecimalPalabras(tokens) {
+  const limpios = tokens.filter(t => t && t !== 'y');
+  if (limpios.length === 0) return 0;
+  const todosDigitos = limpios.every(t => Object.prototype.hasOwnProperty.call(UNIDADES_PALABRA, t));
+  if (todosDigitos) {
+    const digitos = limpios.map(t => UNIDADES_PALABRA[t]).join('');
+    return Number('0.' + digitos);
+  }
+  const n = parseEnteroPalabras(limpios);
+  if (!Number.isFinite(n)) return null;
+  const s = String(Math.abs(Math.trunc(n)));
+  return n / Math.pow(10, s.length);
+}
+
+function numeroDesdeExpresion(expresion) {
+  let s = normalizarNumeroPalabra(expresion)
+    .replace(/\b(?:colones?|dolares?|euros?|crc|usd|eur|por\s+ciento|de)\b/g, ' ')
+    .replace(/[₡$€%]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!s) return null;
+
+  const negativo = /^menos\b/.test(s) || /^-/.test(s);
+  s = s.replace(/^menos\s+/, '').replace(/^-\s*/, '');
+
+  if (/^\d+(?:[.,]\d+)?$/.test(s)) {
+    const n = Number(s.replace(',', '.'));
+    return Number.isFinite(n) ? (negativo ? -n : n) : null;
+  }
+
+  let tokens = s.split(/\s+/).filter(Boolean);
+  if (!tokens.every(t => TOKENS_NUMERO_PALABRA.has(t))) return null;
+
+  const iDecimalOriginal = tokens.findIndex(t => t === 'coma' || t === 'punto');
+  let factorFinal = 1;
+  if (iDecimalOriginal >= 0) {
+    const ult = tokens[tokens.length - 1];
+    if (ult === 'billon' || ult === 'billones') { factorFinal = 1e12; tokens = tokens.slice(0, -1); }
+    else if (ult === 'millon' || ult === 'millones') {
+      if (tokens[tokens.length - 2] === 'mil') { factorFinal = 1e9; tokens = tokens.slice(0, -2); }
+      else { factorFinal = 1e6; tokens = tokens.slice(0, -1); }
+    } else if (ult === 'mil' || ult === 'miles') { factorFinal = 1e3; tokens = tokens.slice(0, -1); }
+  }
+
+  const iDecimal = tokens.findIndex(t => t === 'coma' || t === 'punto');
+  const enteros = iDecimal >= 0 ? tokens.slice(0, iDecimal) : tokens;
+  const decimales = iDecimal >= 0 ? tokens.slice(iDecimal + 1) : [];
+  const entero = parseEnteroPalabras(enteros);
+  if (!Number.isFinite(entero)) return null;
+  const decimal = iDecimal >= 0 ? parseDecimalPalabras(decimales) : 0;
+  if (decimal === null) return null;
+  const valor = (entero + decimal) * factorFinal;
+  return negativo ? -valor : valor;
+}
+
+function palabrasNumeroPatron() {
+  const flexible = palabra => palabra
+    .replace(/a/g, '[aá]')
+    .replace(/e/g, '[eé]')
+    .replace(/i/g, '[ií]')
+    .replace(/o/g, '[oó]')
+    .replace(/u/g, '[uúü]');
+  return [...TOKENS_NUMERO_PALABRA]
+    .filter(x => !['y','coma','punto','menos'].includes(x))
+    .sort((a,b) => b.length-a.length)
+    .map(flexible)
+    .join('|');
+}
+
+function extraerCandidatosNumeroPalabras(texto) {
+  const P = palabrasNumeroPatron();
+  const moneda = '(?:col[oó]n(?:es)?|d[oó]lar(?:es)?|euro(?:s)?|CRC|USD|EUR)';
+  const numero = `(?:menos\\s+)?(?:${P})(?:\\s+(?:(?:y|coma|punto)\\s+)?(?:${P}))*`;
+  const re = new RegExp(`(?:${moneda}\\s+)?${numero}(?:\\s+(?:por\\s+ciento|(?:de\\s+)?${moneda}))?`, 'gi');
+  const encontrados = [];
+  let m;
+  while ((m = re.exec(texto)) !== null) {
+    const termino = m[0].trim();
+    const analizado = analizarNumeroPalabras(termino, true);
+    if (analizado) encontrados.push({ indice:m.index, largo:m[0].length, termino });
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  return encontrados;
+}
+
+function analizarNumeroPalabras(texto, esCandidato=false) {
+  const candidatos = [];
+  if (esCandidato) {
+    candidatos.push(String(texto || '').trim());
+  } else {
+    candidatos.push(...extraerCandidatosNumeroPalabras(String(texto || '')).map(x => x.termino));
+  }
+  if (candidatos.length === 0) return null;
+
+  candidatos.sort((a,b) => b.length-a.length);
+  for (const termino of candidatos) {
+    const valor = numeroDesdeExpresion(termino);
+    if (!Number.isFinite(valor)) continue;
+    const textoCompleto = esCandidato ? termino : String(texto || '');
+    const moneda = detectarMoneda(textoCompleto);
+    const porcentaje = /%|por\s+ciento/i.test(normalizarSignos(textoCompleto));
+    const abs = Math.abs(valor);
+    const formas = new Set();
+    agregarForma(formas, String(abs));
+    const norm = normalizarNumeroPalabra(termino)
+      .replace(/\b(?:colones?|dolares?|euros?|crc|usd|eur|por\s+ciento)\b/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+    const ambiguo = /^(?:un|una|uno)$/.test(norm);
+    return {
+      tipo:'numero', negativo:valor < 0, porcentaje, moneda,
+      formas, valores:[abs], digitos:String(abs).replace(/\D/g,''),
+      tieneSeparador:/\b(?:coma|punto)\b/.test(norm), numeroOriginal:termino,
+      esPalabras:true, ambiguoPalabra:ambiguo, escalaPalabras:/\b(?:mil|millon|millones|billon|billones)\b/.test(norm)
+    };
+  }
+  return null;
+}
+
+function analizarNumeroDigitos(texto) {
+  const s = normalizarSignos(texto);
+  const matchNumero = s.match(/\d+(?:(?:[.,'’\u00A0\u202F ]+)\d+)*/);
+  if (!matchNumero) return null;
+  const antes = s.slice(0, matchNumero.index);
+  const negativo = /-\s*$/.test(antes) || /\bmenos\s*$/i.test(antes);
+  const porcentaje = /%|por\s+ciento/i.test(s);
+  const moneda = detectarMoneda(s);
+  const factor = factorEscalaNumeral(s);
+  const formasBase = formasCanonicasNumero(matchNumero[0]);
+  const formas = new Set();
+  const valores = [];
+  for (const f of formasBase) {
+    const n = Number(f);
+    if (!Number.isFinite(n)) continue;
+    const escalado = Math.abs(n * factor);
+    valores.push(escalado);
+    agregarForma(formas, String(escalado));
+  }
+  const digitos = matchNumero[0].replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0';
+  return {
+    tipo:'numero', negativo, porcentaje, moneda, formas, valores,
+    digitos, tieneSeparador:/[.,'’\u00A0\u202F ]/.test(matchNumero[0]),
+    numeroOriginal:matchNumero[0], esPalabras:false, ambiguoPalabra:false,
+    escalaPalabras:factor !== 1
+  };
+}
+
+function mcd(a, b) {
+  a = Math.abs(Math.round(a));
+  b = Math.abs(Math.round(b));
+  while (b) [a, b] = [b, a % b];
+  return a || 1;
+}
+
+function crearProporcion(numerador, denominador, origen='razon') {
+  if (!Number.isFinite(numerador) || !Number.isFinite(denominador) || denominador <= 0) return null;
+  if (numerador < 0 || numerador > denominador) return null;
+  const valor = numerador / denominador;
+  const divisor = Number.isInteger(numerador) && Number.isInteger(denominador) ? mcd(numerador, denominador) : 1;
+  const numReducido = numerador / divisor;
+  const denReducido = denominador / divisor;
+  const porcentajeEquivalente = valor * 100;
+  const formas = new Set();
+  agregarForma(formas, String(porcentajeEquivalente));
+  return {
+    tipo:'proporcion', origen, numerador, denominador, numReducido, denReducido,
+    valorProporcion:valor, porcentajeEquivalente, negativo:false, porcentaje:false,
+    moneda:null, formas, valores:[porcentajeEquivalente], digitos:`${numerador}${denominador}`,
+    tieneSeparador:true, numeroOriginal:`${numerador} de cada ${denominador}`, esPalabras:false
+  };
+}
+
+function patronNumeroProporcion() {
+  const P = palabrasNumeroPatron();
+  return `(?:\\d+(?:[.,]\\d+)?|(?:${P})(?:\\s+y\\s+(?:${P}))*)`;
+}
+
+function analizarProporcionExplicita(texto) {
+  const s = normalizarSignos(texto).toLowerCase().replace(/\s+/g, ' ').trim();
+  const N = patronNumeroProporcion();
+  let m = s.match(new RegExp(`(${N})\\s+(?:de|por)\\s+cada\\s+(${N})`, 'i'));
+  if (m) {
+    const p = crearProporcion(Math.abs(numeroDesdeExpresion(m[1])), Math.abs(numeroDesdeExpresion(m[2])), 'de_cada');
+    if (p) return p;
+  }
+  m = s.match(/(\d+(?:[.,]\d+)?)\s*[/]\s*(\d+(?:[.,]\d+)?)/);
+  if (m) {
+    const p = crearProporcion(Number(m[1].replace(',','.')), Number(m[2].replace(',','.')), 'fraccion');
+    if (p) return p;
+  }
+  m = s.match(new RegExp(`(${N})\\s+entre\\s+(${N})`, 'i'));
+  if (m) {
+    const p = crearProporcion(Math.abs(numeroDesdeExpresion(m[1])), Math.abs(numeroDesdeExpresion(m[2])), 'entre');
+    if (p) return p;
+  }
+  const nominales = [
+    { re:/\b(?:la\s+)?mitad\b/i, num:1, den:2, origen:'nominal' },
+    { re:/\b(?:un\s+tercio|una\s+tercera\s+parte)\b/i, num:1, den:3, origen:'nominal' },
+    { re:/\b(?:un\s+cuarto|una\s+cuarta\s+parte)\b/i, num:1, den:4, origen:'nominal' },
+    { re:/\b(?:un\s+quinto|una\s+quinta\s+parte)\b/i, num:1, den:5, origen:'nominal' },
+    { re:/\b(?:un\s+decimo|un\s+décimo|una\s+decima\s+parte|una\s+décima\s+parte)\b/i, num:1, den:10, origen:'nominal' }
+  ];
+  for (const n of nominales) if (n.re.test(s)) return crearProporcion(n.num, n.den, n.origen);
+  return null;
+}
+
+function analizarPorcentajeComoProporcion(texto) {
+  const a = analizarNumeroDigitos(texto) || analizarNumeroPalabras(texto);
+  if (!a || !a.porcentaje || a.negativo) return null;
+  const valor = (a.valores || []).find(Number.isFinite);
+  if (!Number.isFinite(valor) || valor < 0 || valor > 100) return null;
+  return { tipo:'porcentaje_proporcion', valorProporcion:valor / 100, porcentaje:valor };
+}
+
+function analizarCifra(texto) {
+  const proporcion = analizarProporcionExplicita(texto);
+  if (proporcion) return proporcion;
+  return analizarNumeroDigitos(texto) || analizarNumeroPalabras(texto);
+}
+
+function candidatosProporcion(texto) {
+  const N = patronNumeroProporcion();
+  const patrones = [
+    new RegExp(`(${N})\\s+(?:de|por)\\s+cada\\s+(${N})`, 'gi'),
+    /\d+(?:[.,]\d+)?\s*[/]\s*\d+(?:[.,]\d+)?/gi,
+    new RegExp(`(${N})\\s+entre\\s+(${N})`, 'gi'),
+    /[+\-]?\s*\d+(?:[.,]\d+)?\s*(?:%|por\s+ciento)/gi,
+    new RegExp(`(?:${palabrasNumeroPatron()})(?:\\s+(?:y\\s+)?(?:${palabrasNumeroPatron()}))*\\s+por\\s+ciento`, 'gi'),
+    /\b(?:la\s+mitad|un\s+tercio|una\s+tercera\s+parte|un\s+cuarto|una\s+cuarta\s+parte|un\s+quinto|una\s+quinta\s+parte|un\s+d[eé]cimo|una\s+d[eé]cima\s+parte)\b/gi
+  ];
+  const encontrados = [];
+  for (const re of patrones) {
+    let m;
+    while ((m = re.exec(texto)) !== null) {
+      encontrados.push({ indice:m.index, largo:m[0].length, termino:m[0] });
+      if (m[0].length === 0) re.lastIndex++;
+    }
+  }
+  encontrados.sort((a,b) => a.indice-b.indice || b.largo-a.largo);
+  const limpios=[];
+  for (const c of encontrados) {
+    const solapa=limpios.some(x=>c.indice<x.indice+x.largo && x.indice<c.indice+c.largo);
+    if (!solapa) limpios.push(c);
+  }
+  return limpios;
+}
+
+function buscarCoincidenciasProporcion(texto, objetivo) {
+  const resultados=[];
+  const TOL=0.0006;
+  for (const c of candidatosProporcion(texto)) {
+    const razon=analizarProporcionExplicita(c.termino);
+    const porcentaje=razon?null:analizarPorcentajeComoProporcion(c.termino);
+    const valor=razon?razon.valorProporcion:porcentaje?.valorProporcion;
+    if (!Number.isFinite(valor) || Math.abs(valor-objetivo.valorProporcion)>TOL) continue;
+    let tipoCoincidencia;
+    if (razon) {
+      tipoCoincidencia = razon.origen==='fraccion' ? 'fraccion_equivalente' :
+                         razon.origen==='nominal' ? 'proporcion_en_palabras' : 'razon_equivalente';
+    } else {
+      tipoCoincidencia = Math.abs(valor-objetivo.valorProporcion)<1e-9 ? 'porcentaje_equivalente' : 'porcentaje_redondeado';
+    }
+    resultados.push({ indice:c.indice, largo:c.largo, termino:c.termino.trim(), tipoCoincidencia });
+  }
+  return resultados;
+}
+
+function valoresDeCifra(objetivo) {
+  if (Array.isArray(objetivo?.valores) && objetivo.valores.length) return objetivo.valores.filter(Number.isFinite).map(Math.abs);
+  return [...(objetivo?.formas || [])].map(Number).filter(Number.isFinite).map(Math.abs);
+}
+
+function casiIgualesNumero(a,b) {
+  const escala=Math.max(1,Math.abs(a),Math.abs(b));
+  return Math.abs(a-b)<=Math.max(1e-9,escala*1e-9);
+}
+
+function compararObjetivosNumero(candidato, objetivo) {
+  if (!candidato || !objetivo || candidato.tipo!=='numero' || objetivo.tipo!=='numero') return null;
+  if (candidato.negativo !== objetivo.negativo) return null;
+  if (candidato.moneda && objetivo.moneda && candidato.moneda !== objetivo.moneda) return null;
+  const vc=valoresDeCifra(candidato), vo=valoresDeCifra(objetivo);
+  const coincide=vc.some(a=>vo.some(b=>casiIgualesNumero(a,b)));
+  if (!coincide) return null;
+
+  if (candidato.ambiguoPalabra) return 'numero_palabras_ambiguo';
+  if (candidato.moneda !== objetivo.moneda) return 'moneda_omitida';
+  if (candidato.moneda && objetivo.moneda) {
+    if (candidato.esPalabras !== objetivo.esPalabras) return 'moneda_numero_palabras';
+    return 'moneda_equivalente';
+  }
+  if (candidato.esPalabras !== objetivo.esPalabras) return 'numero_palabras_equivalente';
+  if (candidato.porcentaje !== objetivo.porcentaje) return 'sin_porcentaje';
+  if (!candidato.esPalabras && candidato.digitos===objetivo.digitos && candidato.tieneSeparador!==objetivo.tieneSeparador) return 'separador_omitido';
+  return 'exacta';
+}
+
+function candidatosNumericosTexto(texto) {
+  const moneda='(?:₡|CRC|USD|US\\$|\\$|€|EUR|col[oó]n(?:es)?|d[oó]lar(?:es)?|euro(?:s)?)';
+  const numero="[+\\-−–—‑‒﹣－]?\\s*\\d+(?:(?:[.,'’\\u00A0\\u202F ]+)\\d+)*";
+  const escala='(?:mil(?:es)?|mill[oó]n(?:es)?|mil\\s+millones?|bill[oó]n(?:es)?)';
+  const sufijo=`(?:%|por\\s+ciento|${moneda})`;
+  const re=new RegExp(`(?:${moneda}\\s*)?${numero}(?:\\s+${escala})?(?:\\s*${sufijo})?`,'gi');
+  const out=[];
+  let m;
+  while((m=re.exec(texto))!==null){
+    const termino=m[0].trim();
+    if (/\d/.test(termino)) out.push({indice:m.index,largo:m[0].length,termino});
+    if(m[0].length===0) re.lastIndex++;
+  }
+  return out;
+}
+
+function buscarCoincidenciasCifra(texto, objetivo) {
+  if (objetivo.tipo === 'proporcion') return buscarCoincidenciasProporcion(texto, objetivo);
+  const resultados=[];
+  const candidatos=[
+    ...candidatosNumericosTexto(texto),
+    ...extraerCandidatosNumeroPalabras(texto)
+  ].sort((a,b)=>a.indice-b.indice || b.largo-a.largo);
+
+  const vistos=new Set();
+  for(const c of candidatos){
+    const analizado=analizarCifra(c.termino);
+    const tipoCoincidencia=compararObjetivosNumero(analizado,objetivo);
+    if(!tipoCoincidencia) continue;
+    const clave=`${c.indice}|${c.largo}|${c.termino.toLowerCase()}`;
+    if(vistos.has(clave)) continue;
+    vistos.add(clave);
+    resultados.push({indice:c.indice,largo:c.largo,termino:c.termino,tipoCoincidencia});
+  }
+  return resultados;
+}
+
+const STOPWORDS_CTX = new Set([
+  'a','al','algo','ante','antes','asi','aun','aunque','bajo','bien','cada','casi','como','con','contra','cual','cuando',
+  'de','del','desde','donde','dos','el','ella','ellas','ello','ellos','en','entre','era','es','esa','ese','eso','esta',
+  'estan','este','esto','estos','fue','ha','hacia','hasta','hay','la','las','le','les','lo','los','mas','mi','muy','ni',
+  'no','nos','o','otra','otro','para','pero','por','porque','que','se','segun','ser','si','sin','sobre','son','su','sus',
+  'tambien','un','una','uno','unos','y','ya'
+]);
+
+function obtenerPalabrasClave(contexto, cifra='') {
+  const tokensCifra = new Set(normalizarBusqueda(cifra).split(' ').filter(Boolean));
+  return [...new Set(
+    normalizarBusqueda(contexto)
+      .split(' ')
+      .filter(t => t.length >= 3 && !STOPWORDS_CTX.has(t) && !tokensCifra.has(t) && !/^\d+$/.test(t))
+  )];
+}
+
+// Busca, retrocediendo desde la coincidencia, la línea más cercana que luce
+// como un título o encabezado (corta, sin punto final, con mayúscula inicial).
+function encontrarEncabezadoCercano(texto, indice) {
+  const antes = texto.slice(Math.max(0, indice - 1200), indice);
+  const lineas = antes.split('\n').map(l => l.trim()).filter(Boolean);
+  for (let i = lineas.length - 1; i >= 0 && i >= lineas.length - 15; i--) {
+    const l = lineas[i];
+    if (l.length >= 4 && l.length <= 90 && !/[.:;,]$/.test(l) && /[A-ZÁÉÍÓÚÑ]/.test(l[0] || '')) {
+      return l;
+    }
+  }
+  return null;
+}
+
+function extraerBloqueContextual(texto, indice, largo, radio=700) {
+  const inicio = Math.max(0, indice - radio);
+  const fin    = Math.min(texto.length, indice + largo + radio);
+  return texto.slice(inicio, fin).replace(/\s+/g, ' ').trim();
+}
+
+function raizToken(token) {
+  if (token.length >= 9) return token.slice(0, 7);
+  if (token.length >= 7) return token.slice(0, 6);
+  if (token.length >= 5) return token.slice(0, 5);
+  return token;
+}
+
+// Construye una explicación breve y legible del porqué del puntaje obtenido.
+function construirExplicacionContexto(n, total, encabezado, encCoincide, capitulo, capCoincide, puntaje) {
+  let base;
+  if (total === 0) base = 'No hay palabras clave adicionales del contexto para comparar, solo se localizó la cifra.';
+  else base = `Coinciden ${n} de ${total} palabra${total !== 1 ? 's' : ''} clave del contexto suministrado.`;
+  const extras = [];
+  if (encCoincide && encabezado) extras.push(`También coincide el encabezado cercano “${encabezado}”.`);
+  if (capCoincide && capitulo) extras.push(`El capítulo o sección indicado (“${capitulo}”) también coincide.`);
+  if (puntaje < 0.20) extras.push('La cifra coincide, pero el contexto suministrado tiene poca relación con este fragmento.');
+  else if (puntaje < 0.45) extras.push('El contexto tiene una relación débil, revise manualmente.');
+  return [base, ...extras].join(' ');
+}
+
+// Evalúa qué tan relacionado está un fragmento con la frase, el capítulo y los
+// encabezados suministrados por la persona auditora. Considera cobertura de
+// palabras clave, orden (bigramas/trigramas), cercanía a la cifra, coincidencia
+// de capítulo/encabezado, y penaliza cuando solo coincide el número.
+function evaluarCoincidenciaContextual({ contexto, capitulo = '', bloque, cifra = '', encabezado = null, nombreHoja = null }) {
+  const ctxNorm = normalizarBusqueda(contexto);
+  const bloqueNorm = normalizarBusqueda(bloque);
+  const palabras = obtenerPalabrasClave(contexto, cifra);
+
+  if (!ctxNorm || !bloqueNorm) {
+    return { puntaje: 0, coincidentes: 0, total: palabras.length, explicacion: 'No hay contexto suficiente para comparar.', palabrasResaltar: [] };
+  }
+  if (bloqueNorm.includes(ctxNorm)) {
+    return { puntaje: 1, coincidentes: palabras.length, total: palabras.length, explicacion: 'La frase del informe coincide de forma literal con este fragmento.', palabrasResaltar: palabras };
+  }
+  if (palabras.length === 0) {
+    return { puntaje: 0.05, coincidentes: 0, total: 0, explicacion: 'Solo se comparó la cifra, sin palabras clave utilizables en el contexto.', palabrasResaltar: [] };
+  }
+
+  const tokensBloque = bloqueNorm.split(' ').filter(Boolean);
+  const tokensBloqueSet = new Set(tokensBloque);
+  const raicesBloque = new Set(tokensBloque.map(raizToken));
+
+  // Palabras más largas o específicas pesan más que palabras cortas y genéricas.
+  const pesoPalabra = p => (p.length >= 9 ? 1.3 : p.length >= 7 ? 1.15 : p.length >= 5 ? 1.0 : 0.7);
+
+  let sumaPeso = 0, sumaCoincidente = 0;
+  const coincidentesLista = [];
+  palabras.forEach(p => {
+    const w = pesoPalabra(p);
+    sumaPeso += w;
+    if (tokensBloqueSet.has(p) || raicesBloque.has(raizToken(p))) { sumaCoincidente += w; coincidentesLista.push(p); }
+  });
+  const cobertura = sumaPeso > 0 ? sumaCoincidente / sumaPeso : 0;
+
+  // Orden de las palabras: bigramas y trigramas de la frase original.
+  const bigramas = [];
+  for (let i = 0; i < palabras.length - 1; i++) bigramas.push(palabras[i] + ' ' + palabras[i + 1]);
+  const trigramas = [];
+  for (let i = 0; i < palabras.length - 2; i++) trigramas.push(palabras[i] + ' ' + palabras[i + 1] + ' ' + palabras[i + 2]);
+  const coberturaBigramas = bigramas.length ? bigramas.filter(b => bloqueNorm.includes(b)).length / bigramas.length : 0;
+  const coberturaTrigramas = trigramas.length ? trigramas.filter(t => bloqueNorm.includes(t)).length / trigramas.length : 0;
+
+  // Cercanía de las palabras clave respecto al centro del bloque (donde está la cifra).
+  const centro = tokensBloque.length / 2;
+  let proxSuma = 0, proxCont = 0;
+  coincidentesLista.forEach(p => {
+    let mejorDist = Infinity;
+    tokensBloque.forEach((t, i) => {
+      if (t === p || raizToken(t) === raizToken(p)) { const d = Math.abs(i - centro); if (d < mejorDist) mejorDist = d; }
+    });
+    if (mejorDist !== Infinity) { proxSuma += 1 / (1 + mejorDist / 10); proxCont++; }
+  });
+  const proximidad = proxCont ? proxSuma / proxCont : 0;
+
+  // Palabras distintivas (largas, poco frecuentes) que suelen identificar el tema.
+  const distintivas = palabras.filter(p => p.length >= 8);
+  const coberturaDistintivas = distintivas.length
+    ? distintivas.filter(p => tokensBloqueSet.has(p) || raicesBloque.has(raizToken(p))).length / distintivas.length
+    : cobertura;
+
+  // Bonificación por capítulo/sección indicado por la persona auditora.
+  let bonusCapitulo = 0;
+  const capNorm = normalizarBusqueda(capitulo || '');
+  if (capNorm) {
+    const capTokens = capNorm.split(' ').filter(t => t.length >= 3 && !STOPWORDS_CTX.has(t));
+    if (capTokens.length) {
+      const encNorm = encabezado ? normalizarBusqueda(encabezado) : '';
+      const capCoincide = capTokens.filter(t => bloqueNorm.includes(t) || encNorm.includes(t)).length / capTokens.length;
+      bonusCapitulo = capCoincide * 0.08;
+    }
+  }
+
+  // Bonificación cuando el encabezado, título o subtítulo cercano usa las mismas palabras clave.
+  let bonusEncabezado = 0, encCoincide = false;
+  if (encabezado) {
+    const encNorm = normalizarBusqueda(encabezado);
+    const n = palabras.filter(p => encNorm.includes(p)).length;
+    if (n > 0) { bonusEncabezado = Math.min(0.08, n * 0.02); encCoincide = true; }
+  }
+
+  let puntaje = cobertura * 0.40 + coberturaBigramas * 0.15 + coberturaTrigramas * 0.10 +
+                proximidad * 0.12 + coberturaDistintivas * 0.08 + bonusCapitulo + bonusEncabezado;
+  puntaje = Math.min(1, Math.max(0, puntaje));
+
+  const explicacion = construirExplicacionContexto(
+    coincidentesLista.length, palabras.length, encabezado, encCoincide, capitulo, bonusCapitulo > 0, puntaje
+  );
+
+  return { puntaje, coincidentes: coincidentesLista.length, total: palabras.length, explicacion, palabrasResaltar: coincidentesLista };
+}
+
+const FORMATOS_COINCIDENCIA = {
+  exacta: 'Formato equivalente',
+  sin_porcentaje: 'Coincide con o sin %',
+  separador_omitido: 'Posible separador omitido',
+  razon_equivalente: 'Razón equivalente',
+  fraccion_equivalente: 'Fracción equivalente',
+  proporcion_en_palabras: 'Proporción escrita con palabras',
+  porcentaje_equivalente: 'Porcentaje equivalente',
+  porcentaje_redondeado: 'Porcentaje equivalente redondeado',
+  excel_formato_visible: 'Valor mostrado en Excel',
+  excel_valor_crudo: 'Valor almacenado en Excel',
+  excel_decimal_porcentaje: 'Excel: decimal equivalente al porcentaje',
+  excel_formula: 'Coincidencia en fórmula de Excel',
+  numero_palabras_equivalente: 'Número equivalente escrito con palabras',
+  numero_palabras_ambiguo: 'Número en palabras; confirme por contexto',
+  moneda_equivalente: 'Monto y moneda equivalentes',
+  moneda_numero_palabras: 'Monto equivalente en números o palabras',
+  moneda_omitida: 'Monto equivalente; moneda omitida en una versión'
+};
+
+const NIVEL_INFO = {
+  alta:       { etiqueta: 'Coincidencia contextual alta',     clase: 'res-score-alto' },
+  probable:   { etiqueta: 'Coincidencia contextual probable', clase: 'res-score-medio' },
+  debil:      { etiqueta: 'Contexto débil',                   clase: 'res-score-medio' },
+  solo_cifra: { etiqueta: 'Solo coincide la cifra',            clase: 'res-score-medio' }
+};
+
+function ubicacionLegible(fuenteTipo, h) {
+  const esExcel = fuenteTipo === 'xlsx' || fuenteTipo === 'xls';
+  if (esExcel) {
+    const fila1 = Number.isInteger(h.fila) ? h.fila + 1 : '?';
+    const colL  = Number.isInteger(h.columna) ? colALetra(h.columna) : '?';
+    return `Hoja: ${h.hoja || ''} · Celda: ${h.celda || '?'} · Fila: ${fila1} · Columna: ${colL}`;
+  }
+  if (fuenteTipo === 'pdf') return `Página ${h.pagina}`;
+  if (fuenteTipo === 'docx') return `Sección aproximada ${h.pagina}`;
+  return `Ubicación aproximada: línea cercana a la sección ${h.pagina}`;
+}
+
+// Construye rangos {ini,fin,tipo} para resaltar la cifra (mk-cifra) y las
+// palabras del contexto que coincidieron (mk-ctx) dentro del fragmento crudo.
+function construirRangosResaltado(fragmento, termino, palabras) {
+  const rangos = [];
+  if (termino) {
+    try {
+      const re = new RegExp(termino.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      let m;
+      while ((m = re.exec(fragmento)) !== null) {
+        rangos.push({ ini: m.index, fin: m.index + m[0].length, tipo: 'cifra' });
+        if (m[0].length === 0) re.lastIndex++;
+      }
+    } catch (e) {}
+  }
+  (palabras || []).slice(0, 25).forEach(p => {
+    if (!p || p.length < 3) return;
+    const escp = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const flex = escp
+      .replace(/a/gi, '[aá]').replace(/e/gi, '[eé]')
+      .replace(/i/gi, '[ií]').replace(/o/gi, '[oó]').replace(/u/gi, '[uúü]');
+    try {
+      const re = new RegExp('\\b' + flex + 's?\\b', 'gi');
+      let m;
+      while ((m = re.exec(fragmento)) !== null) {
+        rangos.push({ ini: m.index, fin: m.index + m[0].length, tipo: 'ctx' });
+        if (m[0].length === 0) re.lastIndex++;
+      }
+    } catch (e) {}
+  });
+
+  rangos.sort((a, b) => a.ini - b.ini || (a.tipo === 'cifra' ? -1 : 1));
+  const limpios = [];
+  for (const r of rangos) {
+    const ultimo = limpios[limpios.length - 1];
+    if (ultimo && r.ini < ultimo.fin) {
+      // Solapamiento: la cifra tiene prioridad visual sobre el contexto.
+      if (r.tipo === 'cifra' && ultimo.tipo !== 'cifra') { ultimo.tipo = 'cifra'; ultimo.fin = Math.max(ultimo.fin, r.fin); }
+      continue;
+    }
+    limpios.push({ ...r });
+  }
+  return limpios;
+}
+
+function resaltarFragmento(fragmento, termino, palabras) {
+  const rangos = construirRangosResaltado(fragmento, termino, palabras);
+  if (rangos.length === 0) return esc(fragmento);
+  let out = '', pos = 0;
+  for (const r of rangos) {
+    if (r.ini < pos) continue;
+    out += esc(fragmento.slice(pos, r.ini));
+    const clase = r.tipo === 'cifra' ? 'mk-cifra' : 'mk-ctx';
+    out += `<mark class="${clase}">${esc(fragmento.slice(r.ini, r.fin))}</mark>`;
+    pos = r.fin;
+  }
+  out += esc(fragmento.slice(pos));
+  return out;
+}
+
+// "Usar esta fuente": respalda el documento completo sin fijar una coincidencia puntual.
+function seleccionarFuente(indice) {
+  coincidenciaSeleccionada = null;
+  if (indice === -1) {
+    fuenteSeleccionada = 'No encontrada';
+  } else {
+    const resultado = ultimasBusquedas[indice];
+    fuenteSeleccionada = resultado ? resultado.fuente.nombre : '';
+  }
+  renderResultados(document.getElementById('inp-cifra').value.trim(), ultimasBusquedas, resumenBusquedaActual);
+}
+
+// "Usar esta coincidencia": fija la ubicación exacta que respalda la cifra.
+function seleccionarCoincidencia(ri, hi) {
+  const r = ultimasBusquedas[ri];
+  const h = r && r.hallazgos[hi];
+  if (!r || !h) return;
+  fuenteSeleccionada = r.fuente.nombre;
+  const huella = r.fuente.huella || r.fuente.nombre;
+  coincidenciaSeleccionada = {
+    archivo: r.fuente.nombre,
+    tipo: r.fuente.tipo,
+    pagina: r.fuente.tipo === 'pdf' ? h.pagina : null,
+    pagina_estimada: (r.fuente.tipo !== 'pdf' && r.fuente.tipo !== 'xlsx' && r.fuente.tipo !== 'xls') ? h.pagina : null,
+    hoja: h.hoja || null,
+    celda: h.celda || null,
+    fila: Number.isInteger(h.fila) ? h.fila + 1 : null,
+    columna: Number.isInteger(h.columna) ? colALetra(h.columna) : null,
+    fragmento: h.fragmento,
+    termino: h.termino,
+    tipo_coincidencia: h.tipoCoincidencia,
+    puntaje_contexto: Math.round(h.puntaje * 100) / 100,
+    fuente_revisada: estaFuenteRevisada(cifraNormActual, ctxNormActual, huella),
+    coincidencia_revisada: !!h._revisada
+  };
+  renderResultados(document.getElementById('inp-cifra').value.trim(), ultimasBusquedas, resumenBusquedaActual);
+}
+
+function toggleFuenteRevisada(ri, checked) {
+  const r = ultimasBusquedas[ri];
+  if (!r) return;
+  const huella = r.fuente.huella || r.fuente.nombre;
+  if (checked) {
+    if (!confirm('¿Desea marcar como revisadas todas las coincidencias de esta fuente?')) {
+      renderResultados(document.getElementById('inp-cifra').value.trim(), ultimasBusquedas, resumenBusquedaActual);
+      return;
+    }
+    r.hallazgos.forEach(h => {
+      h._revisada = true;
+      marcarHallazgoRevisado(cifraNormActual, ctxNormActual, huella, h, true);
+    });
+  }
+  r._revisada = checked;
+  marcarFuenteRevisada(cifraNormActual, ctxNormActual, huella, checked);
+  guardarEstadoRevision();
+  renderResultados(document.getElementById('inp-cifra').value.trim(), ultimasBusquedas, resumenBusquedaActual);
+}
+
+function toggleHallazgoRevisado(ri, hi, checked) {
+  const r = ultimasBusquedas[ri];
+  const h = r && r.hallazgos[hi];
+  if (!r || !h) return;
+  const huella = r.fuente.huella || r.fuente.nombre;
+  h._revisada = checked;
+  marcarHallazgoRevisado(cifraNormActual, ctxNormActual, huella, h, checked);
+  // Si todas las coincidencias quedan revisadas, activar automáticamente "Fuente revisada".
+  const todasRevisadas = r.hallazgos.length > 0 && r.hallazgos.every(x => x._revisada);
+  r._revisada = todasRevisadas;
+  marcarFuenteRevisada(cifraNormActual, ctxNormActual, huella, todasRevisadas);
+  guardarEstadoRevision();
+  renderResultados(document.getElementById('inp-cifra').value.trim(), ultimasBusquedas, resumenBusquedaActual);
+}
+
+function toggleMostrarTodas(ri) {
+  const r = ultimasBusquedas[ri];
+  if (!r) return;
+  r.mostrarTodas = !r.mostrarTodas;
+  renderResultados(document.getElementById('inp-cifra').value.trim(), ultimasBusquedas, resumenBusquedaActual);
+}
+
+function filtrarRevision(valor) {
+  filtroRevisionActual = valor;
+  renderResultados(document.getElementById('inp-cifra').value.trim(), ultimasBusquedas, resumenBusquedaActual);
+}
+
+const HALLAZGOS_POR_PAGINA = 5;
+
+function renderResultados(cifra, resultados, resumen) {
+  const wrap = document.getElementById('resultados-busqueda');
+
+  if (resultados.length === 0) {
+    fuenteSeleccionada = 'No encontrada';
+    coincidenciaSeleccionada = null;
+    wrap.innerHTML=`<div class="sin-resultados">
+      <strong>🔍 No se encontró una cifra equivalente a "${esc(cifra)}" en el texto extraído de los documentos cargados.</strong><br>
+      <span style="font-size:12px;margin-top:6px;display:block">
+        Se probaron números escritos con dígitos o con palabras, punto o coma como separador decimal o de miles, escalas como mil y millones, porcentajes, proporciones equivalentes y monedas en colones, dólares o euros, tanto con palabras como con símbolos o códigos. También se revisan valores de Excel almacenados como fracción (por ejemplo, 0,62 para mostrar 62,0%). Si la cifra está visible en un PDF pero no aparece aquí, probablemente el PDF sea una imagen escaneada y requiera OCR.
+      </span>
+    </div>`;
+    return;
+  }
+
+  const soloBajas = resumen.altas === 0 && resumen.probables === 0;
+  const aviso = soloBajas
+    ? `<div class="sin-resultados" style="margin-bottom:10px;background:#FFF7ED;border-color:#FDBA74;color:#9A3412;">
+         <strong>La cifra sí fue encontrada, pero el contexto tiene poca similitud.</strong><br>
+         <span style="font-size:12px;display:block;margin-top:4px;">Se muestran las apariciones para revisión manual en lugar de ocultarlas.</span>
+       </div>`
+    : '';
+
+  const instruccion = resultados.length === 1
+    ? `<div class="fuente-instruccion"><strong>Fuente seleccionada automáticamente:</strong> ${esc(resultados[0].fuente.nombre)}. Puede marcar “Ninguna” si esta coincidencia no corresponde.</div>`
+    : `<div class="fuente-instruccion"><strong>Seleccione una sola fuente o, con mayor precisión, una sola coincidencia.</strong> Aunque la cifra aparezca en varios documentos, únicamente lo elegido se guardará y se exportará a Excel.</div>`;
+
+  // Resumen de revisión.
+  const totalFuentes = resultados.length;
+  const fuentesRevisadas = resultados.filter(r => r._revisada).length;
+  const totalHallazgos = resultados.reduce((n, r) => n + r.hallazgos.length, 0);
+  const hallazgosRevisados = resultados.reduce((n, r) => n + r.hallazgos.filter(h => h._revisada).length, 0);
+
+  const resumenHTML = `<div class="resumen-revision">
+    <span class="rr-chip ${totalFuentes-fuentesRevisadas>0?'rr-pend':'rr-ok'}">${totalFuentes-fuentesRevisadas} fuente${(totalFuentes-fuentesRevisadas)!==1?'s':''} pendiente${(totalFuentes-fuentesRevisadas)!==1?'s':''}</span>
+    <span class="rr-chip rr-ok">${fuentesRevisadas} fuente${fuentesRevisadas!==1?'s':''} revisada${fuentesRevisadas!==1?'s':''}</span>
+    <span class="rr-chip ${totalHallazgos-hallazgosRevisados>0?'rr-pend':'rr-ok'}">${totalHallazgos-hallazgosRevisados} coincidencia${(totalHallazgos-hallazgosRevisados)!==1?'s':''} pendiente${(totalHallazgos-hallazgosRevisados)!==1?'s':''}</span>
+    <span class="rr-chip rr-ok">${hallazgosRevisados} coincidencia${hallazgosRevisados!==1?'s':''} revisada${hallazgosRevisados!==1?'s':''}</span>
+  </div>`;
+
+  const filtrosHTML = `<div class="filtros-revision">
+    <button class="fr-btn${filtroRevisionActual==='todas'?' activo':''}" onclick="filtrarRevision('todas')">Todas</button>
+    <button class="fr-btn${filtroRevisionActual==='pendientes'?' activo':''}" onclick="filtrarRevision('pendientes')">Pendientes de revisar</button>
+    <button class="fr-btn${filtroRevisionActual==='revisadas'?' activo':''}" onclick="filtrarRevision('revisadas')">Revisadas</button>
+  </div>`;
+
+  // Orden de presentación: pendientes primero, revisadas después (contraídas).
+  const indicesOrdenados = resultados.map((r, ri) => ri).sort((a, b) => {
+    const ra = resultados[a]._revisada ? 1 : 0, rb = resultados[b]._revisada ? 1 : 0;
+    return ra - rb;
+  });
+
+  const tarjetasHTML = indicesOrdenados.map(ri => {
+    const r = resultados[ri];
+    if (filtroRevisionActual === 'pendientes' && r._revisada) return '';
+    if (filtroRevisionActual === 'revisadas' && !r._revisada) return '';
+
+    const tc = claseTipoArchivo(r.fuente.tipo);
+    const elegidaFuente = fuenteSeleccionada === r.fuente.nombre && !coincidenciaSeleccionada;
+    const contraida = r._revisada;
+    const mostrarN = r.mostrarTodas ? r.hallazgos.length : Math.min(HALLAZGOS_POR_PAGINA, r.hallazgos.length);
+    const hallazgosAMostrar = r.hallazgos.slice(0, mostrarN);
+
+    const hallazgosHTML = hallazgosAMostrar.map((h, hi) => {
+      const esExcel = r.fuente.tipo==='xlsx' || r.fuente.tipo==='xls';
+      const ub = ubicacionLegible(r.fuente.tipo, h);
+      const frag = resaltarFragmento(h.fragmento, h.termino, h.palabrasResaltar);
+      const pct = Math.round(h.puntaje*100);
+      const info = NIVEL_INFO[h.nivel] || NIVEL_INFO.solo_cifra;
+      const formato = FORMATOS_COINCIDENCIA[h.tipoCoincidencia] || 'Formato equivalente';
+      const coincidenciaElegida = coincidenciaSeleccionada && coincidenciaSeleccionada.archivo===r.fuente.nombre &&
+        coincidenciaSeleccionada.termino===h.termino && coincidenciaSeleccionada.fragmento===h.fragmento;
+      const etiquetaEstimada = (!esExcel && r.fuente.tipo!=='pdf') ? '<span class="visor-etiqueta-estimada">Ubicación estimada</span>' : '';
+      return `<div class="res-fragmento${h._revisada?' coincidencia-revisada':''}${coincidenciaElegida?' coincidencia-elegida':''}">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-family:'Segoe UI',sans-serif;flex-wrap:wrap;">
+              <span style="font-size:10px;font-weight:700;color:#9CA3AF;flex:1;">${esc(ub)}${etiquetaEstimada}</span>
+              <span style="font-size:10px;font-weight:700;color:#6B7280;background:#F3F4F6;border-radius:12px;padding:3px 8px;">${formato}</span>
+              <span class="res-score ${info.clase}">${info.etiqueta} · ${pct}%</span>
+            </div>
+            <div class="res-explicacion">${esc(h.explicacion || '')}</div>
+            ...${frag}...
+            <div class="res-hallazgo-acciones">
+              <button class="btn-ver" onclick="abrirVisor(${ri},${hi})">&#128269; Ver en el documento</button>
+              <button class="btn-usar-coincidencia${coincidenciaElegida?' activo':''}" onclick="seleccionarCoincidencia(${ri},${hi})">${coincidenciaElegida?'✓ Coincidencia usada':'Usar esta coincidencia'}</button>
+              <label class="chk-coincidencia-revisada">
+                <input type="checkbox" ${h._revisada?'checked':''} onchange="toggleHallazgoRevisado(${ri},${hi},this.checked)">
+                Coincidencia revisada
+              </label>
+            </div>
+          </div>`;
+    }).join('');
+
+    const botonMas = (!r.mostrarTodas && r.hallazgos.length > HALLAZGOS_POR_PAGINA)
+      ? `<button class="btn-mas-coincidencias" onclick="toggleMostrarTodas(${ri})">Mostrar más coincidencias (${r.hallazgos.length - HALLAZGOS_POR_PAGINA} más)</button>`
+      : (r.mostrarTodas && r.hallazgos.length > HALLAZGOS_POR_PAGINA
+        ? `<button class="btn-mas-coincidencias" onclick="toggleMostrarTodas(${ri})">Mostrar menos</button>` : '');
+
+    return `<div class="res-item${elegidaFuente?' fuente-elegida':''}${r._revisada?' fuente-revisada':''}${contraida?' res-fuente-contraida':''}" id="res-fuente-${ri}">
+        <div class="res-item-header">
+          <span class="ftipo ${tc}">${r.fuente.tipo.toUpperCase()}</span>
+          <span class="res-fnombre">${esc(r.fuente.nombre)}</span>
+          <span class="res-cant">${r.aparicionesCifra} aparición${r.aparicionesCifra!==1?'es':''}</span>
+          <label class="chk-fuente-revisada">
+            <input type="checkbox" ${r._revisada?'checked':''} onchange="toggleFuenteRevisada(${ri},this.checked)">
+            ${r._revisada?'☑':'☐'} Fuente revisada
+          </label>
+          <label class="fuente-opcion">
+            <input type="radio" name="fuente-elegida" ${elegidaFuente?'checked':''} onchange="seleccionarFuente(${ri})">
+            Usar esta fuente
+          </label>
+          ${r._revisada?`<button type="button" class="res-contraer-tog" onclick="document.getElementById('res-fuente-${ri}').classList.toggle('res-fuente-contraida')">Mostrar/ocultar</button>`:''}
+        </div>
+        <div class="res-lista-hallazgos">
+          ${hallazgosHTML}
+          ${botonMas}
+        </div>
+      </div>`;
+  }).join('');
+
+  wrap.innerHTML=`
+    ${aviso}
+    ${instruccion}
+    ${resumenHTML}
+    ${filtrosHTML}
+    <div class="res-header">${resumen.totalCifra} aparición${resumen.totalCifra!==1?'es':''} de una cifra equivalente encontrada${resumen.totalCifra!==1?'s':''} y disponible${resumen.totalCifra!==1?'s':''} para revisión, ordenada${resumen.totalCifra!==1?'s':''} por contexto</div>
+    ${tarjetasHTML}
+    <div class="fuente-ninguna">
+      <label class="fuente-opcion">
+        <input type="radio" name="fuente-elegida" ${fuenteSeleccionada==='No encontrada'?'checked':''} onchange="seleccionarFuente(-1)">
+        Ninguna de estas / no encontrada
+      </label>
+    </div>`;
+}
+
+// ── APOYO DEL MANUAL PEN ─────────────────────────────────────────────────────
+function generarAlertasManual(cifra, contexto, objetivo) {
+  const texto = `${cifra} ${contexto}`;
+  const norm = normalizarNumeroPalabra(texto);
+  const alertas = [];
+  const agregar = (tipo, texto) => alertas.push({tipo, texto});
+
+  if (/[₡$€]|\b(?:CRC|USD|EUR|US\$)\b/i.test(texto)) {
+    agregar('aviso', 'Estilo PEN: dentro del texto general, las monedas deben escribirse con letras —colones, dólares o euros— y no con signos. La búsqueda sí reconoce ambos formatos para poder verificar la cifra.');
+  }
+  if (/\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b/.test(texto)) {
+    agregar('aviso', 'Estilo PEN: revise el formato anglosajón. En publicaciones del PEN se usa punto para miles y coma para decimales; los años son una excepción y se escriben sin punto.');
+  }
+  if (/\b\d+(?:[.,]\d+)?\s+mil(?:es)?\b/i.test(texto) && !/\bmil\s+millones?\b/i.test(texto)) {
+    agregar('aviso', 'Estilo PEN: no se recomiendan formas mixtas como “600 mil”; debe escribirse la cifra completa. La excepción permitida es el uso de “millones”, por ejemplo 23,5 millones.');
+  }
+  if (/\b(?:cero|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieciseis|dieciséis|diecisiete|dieciocho|diecinueve|veinte|veintiuno|veintidós|veintidos|veintitrés|veintitres|veinticuatro|veinticinco|veintiséis|veintiseis|veintisiete|veintiocho|veintinueve|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa|cien)\s+por\s+ciento\b/i.test(texto)) {
+    agregar('aviso', 'Estilo PEN: los porcentajes se consignan siempre con números y el símbolo %, por ejemplo 100% y no “cien por ciento”.');
+  }
+  if (/\b(?:19|20)\d{2}[.,]\d{3}\b/.test(texto)) {
+    agregar('aviso', 'Estilo PEN: los años se escriben sin separador de miles.');
+  }
+  if (objetivo?.esPalabras && /porcentaje|tasa|indice|índice|promedio|edad|fecha|estadistic|econ[oó]mic/i.test(norm)) {
+    agregar('info', 'La cifra fue interpretada desde palabras. Recuerde que porcentajes, datos estadísticos, indicadores económicos, fechas y edades se escriben con números en el texto final.');
+  }
+  if (objetivo?.moneda) {
+    agregar('info', `La búsqueda está controlando que el monto corresponda a ${etiquetaMoneda(objetivo.moneda)} y evita equipararlo con otra moneda.`);
+  }
+  if (alertas.length === 0) {
+    agregar('ok', 'No se detectaron alertas automáticas de formato. Aun así, complete los controles de respaldo, unidad, período y consistencia antes de cerrar la revisión.');
+  }
+  return alertas;
+}
+
+function renderAlertasManual(cifra, contexto, objetivo) {
+  alertasManualActual = generarAlertasManual(cifra, contexto, objetivo);
+  const cont = document.getElementById('alertas-manual');
+  if (!cont) return;
+  cont.innerHTML = alertasManualActual.map(a =>
+    `<div class="manual-alerta ${a.tipo}"><strong>${a.tipo==='aviso'?'⚠ Revisión de estilo':a.tipo==='ok'?'✓ Control automático':'ℹ Nota del Manual PEN'}:</strong> ${esc(a.texto)}</div>`
+  ).join('');
+}
+
+function leerControlManualFormulario() {
+  return {
+    tipo_fuente: document.getElementById('inp-tipo-fuente')?.value || 'Sin especificar',
+    respaldo_guardado: !!document.getElementById('chk-respaldo')?.checked,
+    unidad_periodo_verificados: !!document.getElementById('chk-unidad')?.checked,
+    consistencia_visual: !!document.getElementById('chk-visual')?.checked,
+    consistencia_interna: !!document.getElementById('chk-interna')?.checked,
+    alertas_manual: alertasManualActual.map(a => a.texto)
+  };
+}
+
+function totalControlesManual(r) {
+  return ['respaldo_guardado','unidad_periodo_verificados','consistencia_visual','consistencia_interna']
+    .reduce((n,k)=>n+(r?.[k] ? 1 : 0),0);
+}
+
+function siNo(v) { return v ? 'Sí' : 'No'; }
+
+// ── REVISORES PERSONALIZADOS ─────────────────────────────────────────────────
+function guardarRevisores() {
+  try { localStorage.setItem('en_revisores', JSON.stringify(revisores)); } catch(e) {}
+}
+
+function opcionesRevisorHTML(seleccionado='Sin asignar') {
+  const actual = String(seleccionado || 'Sin asignar');
+  const opciones = ['Sin asignar', ...revisores];
+
+  // Conservar nombres usados en registros históricos aunque luego se eliminen del catálogo.
+  if (actual !== 'Sin asignar' && !opciones.some(x => x.toLocaleLowerCase('es') === actual.toLocaleLowerCase('es'))) {
+    opciones.push(actual);
+  }
+
+  return opciones.map(nombre =>
+    `<option value="${esc(nombre)}"${nombre === actual ? ' selected' : ''}>${esc(nombre)}</option>`
+  ).join('');
+}
+
+function renderRevisores() {
+  const select = document.getElementById('inp-rev');
+  const lista  = document.getElementById('lista-revisores');
+  const valorActual = select?.value || 'Sin asignar';
+
+  if (select) {
+    select.innerHTML = opcionesRevisorHTML(valorActual);
+    select.value = revisores.some(x => x === valorActual) ? valorActual : 'Sin asignar';
+  }
+
+  if (!lista) return;
+  if (revisores.length === 0) {
+    lista.innerHTML = '<span class="rev-vacio">No hay revisores creados. Agréguelos conforme los necesite.</span>';
+    return;
+  }
+
+  lista.innerHTML = revisores.map((nombre, i) =>
+    `<span class="rev-chip">${esc(nombre)}<button type="button" title="Quitar revisor" onclick="eliminarRevisor(${i})">&#x2715;</button></span>`
+  ).join('');
+}
+
+function agregarRevisor() {
+  const input = document.getElementById('inp-nuevo-revisor');
+  if (!input) return;
+  const nombre = input.value.replace(/\s+/g, ' ').trim();
+  if (!nombre) { input.focus(); return; }
+
+  const existente = revisores.find(x => x.toLocaleLowerCase('es') === nombre.toLocaleLowerCase('es'));
+  if (existente) {
+    document.getElementById('inp-rev').value = existente;
+    input.value = '';
+    input.focus();
+    return;
+  }
+
+  revisores.push(nombre);
+  guardarRevisores();
+  renderRevisores();
+  document.getElementById('inp-rev').value = nombre;
+  input.value = '';
+  input.focus();
+  renderLista();
+}
+
+function eliminarRevisor(indice) {
+  const nombre = revisores[indice];
+  if (nombre === undefined) return;
+  if (!confirm(`¿Quitar a "${nombre}" de la lista de revisores?\n\nLos registros ya asignados conservarán ese nombre.`)) return;
+
+  revisores.splice(indice, 1);
+  guardarRevisores();
+  renderRevisores();
+  renderLista();
+}
+
+// ── SEMÁFORO ─────────────────────────────────────────────────────────────────
+function selSem(btn) {
+  document.querySelectorAll('.sem-btn').forEach(b=>b.className='sem-btn');
+  semActual = btn.dataset.v;
+  btn.classList.add('sel-'+semActual);
+}
+
+// ── REGISTRAR ────────────────────────────────────────────────────────────────
+function registrar() {
+  const cifra = document.getElementById('inp-cifra').value.trim();
+  const ctx   = document.getElementById('inp-ctx').value.trim();
+  if (!cifra||!ctx)   { alert('Complete la cifra y el contexto.'); return; }
+  if (!semActual)     { alert('Seleccione un resultado en el semáforo.'); return; }
+  if (!fuenteSeleccionada) {
+    alert('Seleccione una sola fuente para registrar, o marque “Ninguna de estas / no encontrada”.');
+    return;
+  }
+
+  // Ubicación exacta que respalda la cifra: la coincidencia puntual elegida
+  // (si la hay) o, en su defecto, solo el nombre de la fuente elegida.
+  const fuenteElegidaObj = ultimasBusquedas.find(r => r.fuente.nombre === fuenteSeleccionada);
+  const huellaFuenteElegida = fuenteElegidaObj ? (fuenteElegidaObj.fuente.huella || fuenteElegidaObj.fuente.nombre) : null;
+  const ubicacionFuente = coincidenciaSeleccionada ? { ...coincidenciaSeleccionada } : {
+    archivo: fuenteSeleccionada === 'No encontrada' ? '' : fuenteSeleccionada,
+    tipo: fuenteElegidaObj ? fuenteElegidaObj.fuente.tipo : '',
+    pagina: null, pagina_estimada: null, hoja: null, celda: null, fila: null, columna: null,
+    fragmento: '', termino: '', tipo_coincidencia: '', puntaje_contexto: null,
+    fuente_revisada: huellaFuenteElegida ? estaFuenteRevisada(cifraNormActual, ctxNormActual, huellaFuenteElegida) : false,
+    coincidencia_revisada: false
+  };
+
+  contador++;
+  registros.unshift({
+    id:      String(contador).padStart(3,'0'),
+    cifra,
+    capitulo:document.getElementById('inp-cap').value.trim(),
+    contexto:ctx,
+    fuente_seleccionada: fuenteSeleccionada,
+    fuentes_encontradas: fuenteSeleccionada, // compatibilidad con registros de versiones anteriores
+    fuentes_candidatas: ultimasBusquedas.map(r=>r.fuente.nombre),
+    semaforo:semActual,
+    revisor: document.getElementById('inp-rev').value,
+    notas:   document.getElementById('inp-notas').value.trim(),
+    fecha:   new Date().toLocaleDateString('es-CR'),
+    n_fuentes: fuenteSeleccionada === 'No encontrada' ? 0 : 1,
+    n_fuentes_candidatas: ultimasBusquedas.length,
+    ubicacion_fuente: ubicacionFuente,
+    fuente_revisada: ubicacionFuente.fuente_revisada || false,
+    coincidencia_revisada: ubicacionFuente.coincidencia_revisada || false,
+    ...leerControlManualFormulario(),
+  });
+
+  guardar(); limpiar(); actualizarStats(); renderLista();
+  document.getElementById('inp-cifra').focus();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function limpiar() {
+  ['inp-cifra','inp-cap','inp-ctx','inp-notas'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('inp-rev').value='Sin asignar';
+  document.querySelectorAll('.sem-btn').forEach(b=>b.className='sem-btn');
+  semActual=null; ultimasBusquedas=[]; fuenteSeleccionada=''; coincidenciaSeleccionada=null; alertasManualActual=[];
+  filtroRevisionActual='todas';
+  const tf=document.getElementById('inp-tipo-fuente'); if(tf) tf.value='Sin especificar';
+  ['chk-respaldo','chk-unidad','chk-visual','chk-interna'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
+  const am=document.getElementById('alertas-manual'); if(am) am.innerHTML='';
+  resumenBusquedaActual = { totalCifra: 0, altas: 0, probables: 0, bajas: 0 };
+  document.getElementById('zona-resultados').style.display='none';
+  document.getElementById('resultados-busqueda').innerHTML='';
+}
+
+function guardar() {
+  try { localStorage.setItem('en_auditoria', JSON.stringify(registros)); } catch(e) {}
+}
+
+// ── STATS ────────────────────────────────────────────────────────────────────
+function actualizarStats() {
+  const v=registros.filter(r=>r.semaforo==='verde').length;
+  const a=registros.filter(r=>r.semaforo==='amarillo').length;
+  const r=registros.filter(r=>r.semaforo==='rojo').length;
+  const t=registros.length;
+  document.getElementById('cnt-v').textContent=v;
+  document.getElementById('cnt-a').textContent=a;
+  document.getElementById('cnt-r').textContent=r;
+  document.getElementById('cnt-t').textContent=t;
+  document.getElementById('bdg-rev').textContent=t;
+  if (t>0) {
+    document.getElementById('h-prog').style.display='block';
+    const pct=n=>((n/t)*100).toFixed(1);
+    document.getElementById('h-prog-track').innerHTML=
+      `<div style="width:${pct(v)}%;background:#4ADE80;height:100%;"></div>
+       <div style="width:${pct(a)}%;background:#FDE047;height:100%;"></div>
+       <div style="width:${pct(r)}%;background:#F87171;height:100%;"></div>`;
+    const pend=t-v-a-r;
+    document.getElementById('h-prog-lbl').textContent=
+      (v+a+r)+' de '+t+' revisadas'+(pend>0?' · '+pend+' sin marcar':'');
+  }
+}
+
+// ── LISTA REGISTROS ──────────────────────────────────────────────────────────
+// Devuelve una sola fuente. Los registros antiguos siguen siendo compatibles.
+function ubicacionResumenTexto(u) {
+  if (!u) return '';
+  const partes = [];
+  if (u.pagina) partes.push('Página ' + u.pagina);
+  else if (u.pagina_estimada) partes.push('Página estimada ' + u.pagina_estimada);
+  if (u.hoja) partes.push('Hoja ' + u.hoja);
+  if (u.celda) partes.push('Celda ' + u.celda);
+  if (u.fila) partes.push('Fila ' + u.fila);
+  if (u.columna) partes.push('Columna ' + u.columna);
+  return partes.length ? 'Ubicación guardada: ' + partes.join(' · ') : '';
+}
+
+function obtenerFuenteRegistro(r) {
+  return String(r?.fuente_seleccionada || r?.fuentes_encontradas || 'No encontrada');
+}
+
+const SEM={
+  verde:    {pill:'sp-v', barra:'sb-v', icono:'🟢', texto:'Verificado'},
+  amarillo: {pill:'sp-a', barra:'sb-a', icono:'🟡', texto:'En revisión'},
+  rojo:     {pill:'sp-r', barra:'sb-r', icono:'🔴', texto:'Con problema'},
+  pendiente:{pill:'sp-p', barra:'sb-p', icono:'⚪', texto:'Sin marcar'},
+};
+
+function renderLista() {
+  const busq=(document.getElementById('busqueda')?.value||'').toLowerCase();
+  const semF=document.getElementById('fil-sem')?.value||'Todos';
+  const filtrados=registros.filter(r=>{
+    if (semF!=='Todos'&&r.semaforo!==semF) return false;
+    if (busq&&!r.cifra.toLowerCase().includes(busq)&&!r.contexto.toLowerCase().includes(busq)) return false;
+    return true;
+  });
+  const cont=document.getElementById('lista');
+  if (registros.length===0) {
+    cont.innerHTML=`<div class="vacio"><div class="vi">📋</div><div class="vt">Aún no hay cifras registradas</div><div class="vd">Ingrese una cifra arriba y presione "Buscar".<br>La herramienta la buscará en todos los documentos cargados.</div></div>`;
+    return;
+  }
+  if (filtrados.length===0) {
+    cont.innerHTML=`<div class="vacio"><div class="vt">Sin resultados para estos filtros</div></div>`;
+    return;
+  }
+  cont.innerHTML=filtrados.map(r=>{
+    const s=SEM[r.semaforo]||SEM.pendiente;
+    const isE=expandido===r.id;
+    const semOpts=[{v:'verde',l:'🟢 Verificado'},{v:'amarillo',l:'🟡 En revisión'},{v:'rojo',l:'🔴 Con problema'},{v:'pendiente',l:'⚪ Sin marcar'}]
+      .map(o=>`<option value="${o.v}"${o.v===r.semaforo?' selected':''}>${o.l}</option>`).join('');
+    const revOpts = opcionesRevisorHTML(r.revisor || 'Sin asignar');
+    return `
+    <div class="tarjeta" id="t-${r.id}">
+      <div class="tarjeta-cab" onclick="tog('${r.id}')">
+        <div class="sb ${s.barra}"></div>
+        <div style="min-width:0">
+          <div class="tcifra">${esc(r.cifra)}</div>
+          <div class="tctx">${esc(r.contexto)}</div>
+        </div>
+        <span class="spill ${s.pill}">${s.icono} ${s.texto}</span>
+        <span class="trev">${r.revisor==='Sin asignar'?'—':r.revisor.split(' ')[0]}</span>
+        <span class="ttog">${isE?'▲':'▼'}</span>
+      </div>
+      ${isE?`
+      <div class="tarjeta-det">
+        ${r.capitulo?`<div style="font-size:11px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">${esc(r.capitulo)}</div>`:''}
+        <div class="ctx-bloque">${esc(r.contexto)}</div>
+        <div style="font-size:12px;color:#6B7280;margin-bottom:12px;">
+          <strong>Fuente seleccionada:</strong> ${esc(obtenerFuenteRegistro(r))}
+          ${obtenerFuenteRegistro(r)!=='No encontrada'?`· <span style="color:#2D7D46">1 fuente</span>`:'· <span style="color:#B45309">No encontrada</span>'}
+          <span class="manual-resumen">Control PEN: ${totalControlesManual(r)}/4</span>
+          ${r.fuente_revisada?'<span class="manual-resumen" style="background:#DCFCE7;color:#166534;">☑ Fuente revisada</span>':''}
+          ${r.coincidencia_revisada?'<span class="manual-resumen" style="background:#DCFCE7;color:#166534;">☑ Coincidencia revisada</span>':''}
+          ${ubicacionResumenTexto(r.ubicacion_fuente) ? `<div style="margin-top:6px;font-size:11px;color:#9CA3AF;">${esc(ubicacionResumenTexto(r.ubicacion_fuente))}</div>` : ''}
+        </div>
+        <div class="det2">
+          <div class="campo"><label>Resultado</label><select onchange="upd('${r.id}','semaforo',this.value)">${semOpts}</select></div>
+          <div class="campo"><label>Revisor</label><select onchange="upd('${r.id}','revisor',this.value)">${revOpts}</select></div>
+          <div class="campo det-full2"><label>Fuente seleccionada</label>
+            <input type="text" value="${esc(obtenerFuenteRegistro(r))}" onchange="upd('${r.id}','fuente_seleccionada',this.value.trim() || 'No encontrada')">
+          </div>
+          <div class="campo"><label>Tipo de fuente o respaldo</label>
+            <select onchange="upd('${r.id}','tipo_fuente',this.value)">
+              ${['Sin especificar','Fuente oficial o primaria','Ponencia o informe de investigación','Base propia o procesamiento reproducible','Publicación, memoria u otro estudio','Otra fuente'].map(x=>`<option value="${esc(x)}"${x===(r.tipo_fuente||'Sin especificar')?' selected':''}>${esc(x)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="campo det-full2">
+            <div class="manual-detalle">
+              <strong style="font-size:11px;color:#1B2B4B;text-transform:uppercase;letter-spacing:.05em;">Controles del Manual PEN</strong>
+              <div style="font-size:10px;color:#6B7280;line-height:1.4;margin-top:4px;">Marque únicamente las comprobaciones realizadas. Los controles de visualización y repetición pueden quedar sin marcar cuando no aplican.</div>
+              <div class="manual-detalle-grid">
+                <label title="Se guardó el archivo o documento que respalda la cifra."><input type="checkbox" ${r.respaldo_guardado?'checked':''} onchange="upd('${r.id}','respaldo_guardado',this.checked)"> Respaldo oficial o primario guardado.</label>
+                <label title="Se confirmó la unidad, el período y el tipo de cifra."><input type="checkbox" ${r.unidad_periodo_verificados?'checked':''} onchange="upd('${r.id}','unidad_periodo_verificados',this.checked)"> Unidad, período y naturaleza verificados.</label>
+                <label title="Solo aplica cuando existe una visualización relacionada."><input type="checkbox" ${r.consistencia_visual?'checked':''} onchange="upd('${r.id}','consistencia_visual',this.checked)"> Coincide con gráfico, cuadro o figura, si aplica.</label>
+                <label title="Solo aplica cuando la cifra se repite en otros apartados."><input type="checkbox" ${r.consistencia_interna?'checked':''} onchange="upd('${r.id}','consistencia_interna',this.checked)"> Coincide en otras secciones o capítulos, si aplica.</label>
+              </div>
+            </div>
+          </div>
+          <div class="campo det-full2"><label>Notas</label>
+            <textarea rows="2" onchange="upd('${r.id}','notas',this.value)" placeholder="Observaciones, discrepancias, aclaraciones...">${esc(r.notas||'')}</textarea>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#9CA3AF;">Registrada el ${r.fecha}</div>
+        <div class="det-acciones"><button class="btn-del" onclick="eliminar('${r.id}')">Eliminar registro</button></div>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function tog(id) { expandido=expandido===id?null:id; renderLista(); }
+function upd(id,campo,valor) {
+  const r=registros.find(x=>x.id===id);
+  if (!r) return;
+  r[campo]=valor;
+  if (campo==='fuente_seleccionada') {
+    r.fuentes_encontradas = valor;
+    r.n_fuentes = valor === 'No encontrada' ? 0 : 1;
+  }
+  guardar(); actualizarStats();
+  if (['semaforo','revisor','fuente_seleccionada','tipo_fuente','respaldo_guardado','unidad_periodo_verificados','consistencia_visual','consistencia_interna'].includes(campo)) renderLista();
+}
+function eliminar(id) {
+  if (!confirm('¿Eliminar este registro?')) return;
+  registros=registros.filter(r=>r.id!==id);
+  if (expandido===id) expandido=null;
+  guardar(); actualizarStats(); renderLista();
+}
+
+// ── REPORTE ──────────────────────────────────────────────────────────────────
+function abrirReporte() {
+  const t=registros.length;
+  if (t===0) { alert('No hay registros aún.'); return; }
+  const v=registros.filter(r=>r.semaforo==='verde').length;
+  const a=registros.filter(r=>r.semaforo==='amarillo').length;
+  const ro=registros.filter(r=>r.semaforo==='rojo').length;
+  const p=t-v-a-ro;
+  const cards=[{n:v,l:'Verificadas',bg:'#DCFCE7',tc:'#166534'},{n:a,l:'En revisión',bg:'#FEF9C3',tc:'#854D0E'},{n:ro,l:'Con problema',bg:'#FEE2E2',tc:'#991B1B'},{n:p,l:'Sin marcar',bg:'#F3F4F6',tc:'#374151'}]
+    .map(c=>`<div class="rep-card" style="background:${c.bg}"><div class="rep-n" style="color:${c.tc}">${c.n}</div><div class="rep-l" style="color:${c.tc}">${c.l}</div><div class="rep-p" style="color:${c.tc}">${((c.n/t)*100).toFixed(1)}%</div></div>`).join('');
+  const prob=registros.filter(r=>r.semaforo==='rojo');
+  const enrev=registros.filter(r=>r.semaforo==='amarillo');
+  const alertaP=prob.length>0?`<div class="alerta" style="background:#FEE2E2;border:1px solid #FCA5A5"><h3 style="color:#991B1B">🔴 ${prob.length} cifra${prob.length>1?'s':''} con problema</h3>${prob.map(r=>`<div class="ai"><strong>${esc(r.cifra)}</strong>${r.notas?`<br><span style="color:#991B1B;font-size:12px">${esc(r.notas)}</span>`:''}</div>`).join('')}</div>`:'';
+  const alertaA=enrev.length>0?`<div class="alerta" style="background:#FEF9C3;border:1px solid #FDE047"><h3 style="color:#854D0E">🟡 ${enrev.length} pendiente${enrev.length>1?'s':''}</h3>${enrev.map(r=>`<div class="ai"><strong>${esc(r.cifra)}</strong>${r.notas?`<br><span style="color:#854D0E;font-size:12px">${esc(r.notas)}</span>`:''}</div>`).join('')}</div>`:'';
+  const fRev = registros.filter(r=>r.fuente_revisada).length;
+  const cRev = registros.filter(r=>r.coincidencia_revisada).length;
+  const revisionResumen = `<div class="alerta" style="background:#EEF2FF;border:1px solid #C7D2FE"><h3 style="color:#1B2B4B">📋 Revisión de coincidencias</h3>
+    <div class="ai">Registros con fuente marcada como revisada: <strong>${fRev}</strong> de ${t}</div>
+    <div class="ai">Registros con coincidencia puntual marcada como revisada: <strong>${cRev}</strong> de ${t}</div>
+  </div>`;
+  document.getElementById('contenido-rep').innerHTML=`<div class="rep-grid">${cards}</div>${revisionResumen}${alertaP}${alertaA}<div style="font-size:12px;color:#9CA3AF;text-align:right;margin-top:8px">${t} cifras · ${new Date().toLocaleDateString('es-CR')}</div>`;
+  document.getElementById('modal').classList.add('abierto');
+}
+function cerrarM() { document.getElementById('modal').classList.remove('abierto'); }
+
+// ── EXPORTACIÓN A EXCEL ──────────────────────────────────────────────────────
+function exportarExcel() {
+  if (registros.length===0) { alert('No hay registros para exportar.'); return; }
+  if (typeof XLSX === 'undefined') {
+    alert('No fue posible cargar el componente de Excel. Revise su conexión e intente nuevamente.');
+    return;
+  }
+
+  const ETIQ={verde:'Verificado',amarillo:'En revisión',rojo:'Con problema',pendiente:'Sin marcar'};
+  const encabezados=[
+    'Cifra',
+    'Capítulo',
+    'Contexto',
+    'Fuente seleccionada',
+    'Tipo de fuente o respaldo',
+    'Respaldo guardado',
+    'Unidad y período verificados',
+    'Coincide con gráfico/cuadro/figura',
+    'Consistencia en otras secciones',
+    'Alertas automáticas del Manual PEN',
+    'Resultado',
+    'Revisor',
+    'Notas',
+    'Fecha',
+    'Archivo fuente',
+    'Tipo de archivo',
+    'Página',
+    'Página estimada',
+    'Hoja',
+    'Celda',
+    'Fila',
+    'Columna',
+    'Fragmento seleccionado',
+    'Tipo de coincidencia',
+    'Puntaje contextual',
+    'Fuente revisada',
+    'Coincidencia revisada'
+  ];
+
+  const filas=registros.map(r=>{
+    const u = r.ubicacion_fuente || {};
+    return [
+    String(r.cifra || ''),
+    String(r.capitulo || ''),
+    String(r.contexto || ''),
+    obtenerFuenteRegistro(r),
+    String(r.tipo_fuente || 'Sin especificar'),
+    siNo(r.respaldo_guardado),
+    siNo(r.unidad_periodo_verificados),
+    siNo(r.consistencia_visual),
+    siNo(r.consistencia_interna),
+    Array.isArray(r.alertas_manual) ? r.alertas_manual.join(' | ') : String(r.alertas_manual || ''),
+    String(ETIQ[r.semaforo] || ''),
+    String(r.revisor || ''),
+    String(r.notas || ''),
+    String(r.fecha || ''),
+    String(u.archivo || ''),
+    String(u.tipo || ''),
+    u.pagina ?? '',
+    u.pagina_estimada ?? '',
+    String(u.hoja || ''),
+    String(u.celda || ''),
+    u.fila ?? '',
+    String(u.columna || ''),
+    String(u.fragmento || ''),
+    String(u.tipo_coincidencia || ''),
+    u.puntaje_contexto ?? '',
+    siNo(r.fuente_revisada),
+    siNo(r.coincidencia_revisada)
+  ];});
+
+  const ws = XLSX.utils.aoa_to_sheet([encabezados, ...filas]);
+
+  // Anchos cómodos para abrir el archivo directamente en Excel.
+  ws['!cols'] = [
+    {wch:18}, // Cifra
+    {wch:28}, // Capítulo
+    {wch:75}, // Contexto
+    {wch:48}, // Fuente seleccionada
+    {wch:38}, // Tipo de fuente
+    {wch:20}, // Respaldo
+    {wch:25}, // Unidad y período
+    {wch:30}, // Consistencia visual
+    {wch:30}, // Consistencia interna
+    {wch:65}, // Alertas del Manual
+    {wch:18}, // Resultado
+    {wch:26}, // Revisor
+    {wch:42}, // Notas
+    {wch:14}, // Fecha
+    {wch:40}, // Archivo fuente
+    {wch:14}, // Tipo de archivo
+    {wch:10}, // Página
+    {wch:14}, // Página estimada
+    {wch:22}, // Hoja
+    {wch:12}, // Celda
+    {wch:10}, // Fila
+    {wch:12}, // Columna
+    {wch:60}, // Fragmento
+    {wch:26}, // Tipo de coincidencia
+    {wch:16}, // Puntaje contextual
+    {wch:16}, // Fuente revisada
+    {wch:20}  // Coincidencia revisada
+  ];
+
+  ws['!autofilter'] = { ref: `A1:${colALetra(encabezados.length - 1)}${filas.length + 1}` };
+  ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' };
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Auditoría de cifras');
+
+  // El formato XLSX conserva correctamente tildes, eñes y demás caracteres especiales.
+  const nombre = 'auditoria_EN_' + new Date().toISOString().slice(0,10) + '.xlsx';
+  XLSX.writeFile(wb, nombre, { bookType:'xlsx', compression:true });
+}
+
+
+// ── VISOR DE DOCUMENTOS (v17) ────────────────────────────────────────────────
+let visorHits        = [];   // lista de todos los hits del documento abierto
+let visorHitIdx       = 0;   // hit actual
+let visorRi            = null; // índice de la fuente (dentro de ultimasBusquedas) abierta en el visor
+let visorFuente       = null;// fuente activa en el visor
+let visorCifra        = '';  // término buscado
+let visorZoom         = 1;   // nivel de acercamiento (solo PDF por ahora)
+let visorPdfDoc       = null;// documento pdf.js cargado (se conserva entre coincidencias)
+let visorPdfArchivoId = null;
+
+async function abrirVisor(ri, hi) {
+  const resultado = ultimasBusquedas[ri];
+  if (!resultado) return;
+  visorRi     = ri;
+  visorFuente = resultado.fuente;
+  visorHits   = resultado.hallazgos;
+  visorHitIdx = hi;
+  visorZoom   = 1;
+
+  const tc = claseTipoArchivo(visorFuente.tipo);
+  document.getElementById('visor-tipo').className = 'vtipo ' + tc;
+  document.getElementById('visor-tipo').textContent = visorFuente.tipo.toUpperCase();
+  document.getElementById('visor-nombre').textContent = visorFuente.nombre;
+  document.getElementById('visor-overlay').classList.add('abierto');
+  actualizarZoomLbl();
+
+  await mostrarHitVisor(hi);
+}
+
+function cerrarVisor() {
+  document.getElementById('visor-overlay').classList.remove('abierto');
+  visorRi = null;
+}
+
+async function mostrarHitVisor(hitIdx) {
+  visorHitIdx = hitIdx;
+  const hit = visorHits[hitIdx];
+  if (!hit) return;
+  visorCifra = hit.termino;
+
+  const nav = document.getElementById('visor-nav');
+  nav.style.display = visorHits.length > 1 ? 'flex' : 'none';
+  actualizarNavHits(hitIdx);
+
+  const tipo = visorFuente.tipo;
+  document.getElementById('visor-zoom').style.display = (tipo === 'pdf') ? 'flex' : 'none';
+
+  const esExcel = tipo === 'xlsx' || tipo === 'xls';
+  const ub = ubicacionLegible(tipo, hit);
+  const etiquetaEstimada = (tipo === 'docx' || (!esExcel && tipo !== 'pdf')) ? ' <span class="visor-etiqueta-estimada">Ubicación estimada</span>' : '';
+  document.getElementById('visor-ubicacion').innerHTML = esc(ub) + etiquetaEstimada;
+
+  if (esExcel) {
+    document.getElementById('visor-tabs-hoja').style.display = '';
+    renderVisorExcel(hitIdx);
+  } else if (tipo === 'pdf') {
+    document.getElementById('visor-tabs-hoja').style.display = 'none';
+    await renderVisorPDF(hitIdx);
+  } else if (tipo === 'docx') {
+    document.getElementById('visor-tabs-hoja').style.display = 'none';
+    await renderVisorWord(hitIdx);
+  } else if (tipo === 'html' || tipo === 'htm') {
+    document.getElementById('visor-tabs-hoja').style.display = 'none';
+    renderVisorHTML(hitIdx);
+  } else {
+    document.getElementById('visor-tabs-hoja').style.display = 'none';
+    renderVisorLineas(hitIdx);
+  }
+
+  renderPanelLateral(hit, ub);
+}
+
+// Panel lateral: explica por qué se considera coincidencia, muestra el fragmento
+// y permite marcar la coincidencia (y, si corresponde, la fuente) como revisada
+// sin necesidad de volver a la lista de resultados.
+function renderPanelLateral(hit, ubicacionTexto) {
+  const panel = document.getElementById('visor-panel-lateral');
+  if (!panel) return;
+  const info = NIVEL_INFO[hit.nivel] || NIVEL_INFO.solo_cifra;
+  const formato = FORMATOS_COINCIDENCIA[hit.tipoCoincidencia] || 'Formato equivalente';
+  const pct = Math.round(hit.puntaje * 100);
+  const resultado = visorRi != null ? ultimasBusquedas[visorRi] : null;
+  panel.innerHTML = `
+    <label class="chk-coincidencia-revisada" style="font-size:12px;margin-top:0;margin-bottom:14px;padding:7px 10px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;">
+      <input type="checkbox" ${hit._revisada?'checked':''} onchange="toggleRevisadaDesdeVisor(this.checked)">
+      Coincidencia revisada
+    </label>
+    <h4>Ubicación</h4>
+    <div class="vp-meta">${esc(ubicacionTexto)}</div>
+    <h4>Coincidencia contextual</h4>
+    <div class="vp-meta"><strong>${esc(info.etiqueta)}</strong> · ${pct}%</div>
+    <div class="vp-meta">${esc(formato)}</div>
+    <div class="vp-meta">${esc(hit.explicacion || '')}</div>
+    <h4>Fragmento relacionado</h4>
+    <div class="vp-frag">...${resaltarFragmento(hit.fragmento, hit.termino, hit.palabrasResaltar)}...</div>
+    ${resultado && resultado._revisada ? '<div class="vp-meta" style="color:#166534;font-weight:700;">☑ Fuente revisada (todas sus coincidencias)</div>' : ''}
+  `;
+}
+
+// Marca o desmarca la coincidencia actualmente abierta en el visor, sin
+// necesidad de cerrar el visor y volver a la lista de resultados.
+function toggleRevisadaDesdeVisor(checked) {
+  if (visorRi == null) return;
+  toggleHallazgoRevisado(visorRi, visorHitIdx, checked);
+  const hit = visorHits[visorHitIdx];
+  if (hit) renderPanelLateral(hit, ubicacionLegible(visorFuente.tipo, hit));
+}
+
+function actualizarZoomLbl() {
+  const lbl = document.getElementById('visor-zoom-lbl');
+  if (lbl) lbl.textContent = Math.round(visorZoom * 100) + '%';
+}
+
+function zoomVisor(dir) {
+  visorZoom = Math.min(3, Math.max(0.5, +(visorZoom + dir * 0.2).toFixed(2)));
+  actualizarZoomLbl();
+  if (visorFuente && visorFuente.tipo === 'pdf') renderVisorPDF(visorHitIdx);
+}
+
+// Resalta el término buscado dentro de HTML real (Word/HTML), preservando la
+// estructura (títulos, párrafos, listas, tablas) y marcando la primera
+// aparición como el hallazgo actual.
+function resaltarEnHTML(html, termino) {
+  const div = document.createElement('div');
+  div.innerHTML = html || '';
+  div.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(el => el.remove());
+  div.querySelectorAll('*').forEach(el => {
+    [...el.attributes].forEach(attr => {
+      if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
+      if ((attr.name === 'href' || attr.name === 'src') && /^\s*javascript:/i.test(attr.value)) el.removeAttribute(attr.name);
+    });
+  });
+
+  if (termino) {
+    let re;
+    try { re = new RegExp(termino.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'); } catch (e) { re = null; }
+    if (re) {
+      const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
+      const nodos = [];
+      let n; while ((n = walker.nextNode())) nodos.push(n);
+      let marcado = false;
+      nodos.forEach(nodo => {
+        const texto = nodo.nodeValue;
+        re.lastIndex = 0;
+        if (!re.test(texto)) return;
+        re.lastIndex = 0;
+        const frag = document.createDocumentFragment();
+        let last = 0, m;
+        while ((m = re.exec(texto)) !== null) {
+          frag.appendChild(document.createTextNode(texto.slice(last, m.index)));
+          const mk = document.createElement('mark');
+          mk.textContent = m[0];
+          if (!marcado) { mk.classList.add('hit-actual'); marcado = true; }
+          frag.appendChild(mk);
+          last = m.index + m[0].length;
+          if (m[0].length === 0) re.lastIndex++;
+        }
+        frag.appendChild(document.createTextNode(texto.slice(last)));
+        nodo.parentNode.replaceChild(frag, nodo);
+      });
+    }
+  }
+  return div.innerHTML;
+}
+
+// Vista de respaldo en texto plano (se usa si el PDF o el Word no pudieron renderizarse).
+function renderTextoPlanoFallbackHTML(hitIdx) {
+  const hit = visorHits[hitIdx];
+  const pag = visorFuente.paginas.find(p => p.n === hit.pagina) || visorFuente.paginas[0] || { texto: '' };
+  let contadorHit = 0;
+  let re; try { re = new RegExp(visorCifra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'); } catch (e) { re = null; }
+  const textoHTML = re ? esc(pag.texto).replace(re, m => {
+    const cls = contadorHit === 0 ? 'hit-actual' : '';
+    contadorHit++;
+    return `<mark class="${cls}">${m}</mark>`;
+  }) : esc(pag.texto);
+  return `<div class="visor-texto">${textoHTML}</div>`;
+}
+
+// ── VISOR PDF: renderiza la página real con pdf.js sobre un <canvas> ────────
+async function renderVisorPDF(hitIdx) {
+  const hit = visorHits[hitIdx];
+  const cont = document.getElementById('visor-body');
+
+  if (!visorFuente.archivoOriginal || typeof pdfjsLib === 'undefined') {
+    cont.innerHTML = '<div style="padding:20px;color:#9CA3AF;">No fue posible conservar el archivo original para renderizar la página. Se muestra el texto extraído.</div>' + renderTextoPlanoFallbackHTML(hitIdx);
+    return;
+  }
+
+  try {
+    if (!visorPdfDoc || visorPdfArchivoId !== visorFuente.id) {
+      cont.innerHTML = '<div style="padding:40px;text-align:center;color:#9CA3AF;">Cargando PDF original...</div>';
+      const buf = await visorFuente.archivoOriginal.arrayBuffer();
+      visorPdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+      visorPdfArchivoId = visorFuente.id;
+    }
+
+    const page = await visorPdfDoc.getPage(hit.pagina);
+    const viewport = page.getViewport({ scale: visorZoom * 1.3 });
+    cont.innerHTML = '<div class="pdf-canvas-wrap"><canvas id="visor-pdf-canvas"></canvas><div id="visor-pdf-overlay" style="position:absolute;top:0;left:0;"></div></div>';
+    const canvas = document.getElementById('visor-pdf-canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+    // Resaltado aproximado: superpone cajas sobre los elementos de texto que
+    // contienen el término buscado, usando las posiciones que entrega pdf.js.
+    const overlay = document.getElementById('visor-pdf-overlay');
+    overlay.style.width = viewport.width + 'px';
+    overlay.style.height = viewport.height + 'px';
+    const terminoNorm = normalizarBusqueda(hit.termino).split(' ').filter(Boolean)[0] || '';
+    if (terminoNorm) {
+      const textContent = await page.getTextContent();
+      textContent.items.forEach(item => {
+        const strNorm = normalizarBusqueda(item.str);
+        if (!strNorm || !strNorm.includes(terminoNorm)) return;
+        const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+        const altura = Math.hypot(tx[2], tx[3]) || 10;
+        const div = document.createElement('div');
+        div.className = 'pdf-hit-box';
+        div.style.left = tx[4] + 'px';
+        div.style.top = (tx[5] - altura) + 'px';
+        div.style.width = Math.max((item.width || 0) * viewport.scale, 8) + 'px';
+        div.style.height = Math.max(altura, 10) + 'px';
+        overlay.appendChild(div);
+      });
+    }
+
+    setTimeout(() => {
+      const el = document.querySelector('#visor-pdf-overlay .pdf-hit-box');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    }, 80);
+  } catch (err) {
+    console.warn('No se pudo renderizar la página del PDF', err);
+    cont.innerHTML = '<div style="padding:20px;color:#991B1B;">No fue posible renderizar la página original del PDF. Se muestra el texto extraído.</div>' + renderTextoPlanoFallbackHTML(hitIdx);
+  }
+}
+
+// ── VISOR WORD: usa mammoth.convertToHtml para conservar la estructura real ──
+async function renderVisorWord(hitIdx) {
+  const cont = document.getElementById('visor-body');
+  if (!visorFuente.archivoOriginal || typeof mammoth === 'undefined') {
+    cont.innerHTML = renderTextoPlanoFallbackHTML(hitIdx);
+    return;
+  }
+  try {
+    if (!visorFuente.wordHtmlCache) {
+      cont.innerHTML = '<div style="padding:40px;text-align:center;color:#9CA3AF;">Generando la vista del documento...</div>';
+      const buf = await visorFuente.archivoOriginal.arrayBuffer();
+      const res = await mammoth.convertToHtml({ arrayBuffer: buf });
+      visorFuente.wordHtmlCache = res.value;
+    }
+    const hit = visorHits[hitIdx];
+    const htmlResaltado = resaltarEnHTML(visorFuente.wordHtmlCache, hit.termino);
+    cont.innerHTML = `<div class="visor-word-html">${htmlResaltado}</div>`;
+    setTimeout(() => {
+      const el = document.querySelector('.visor-word-html mark.hit-actual');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+  } catch (err) {
+    console.warn('No se pudo generar la vista de Word', err);
+    cont.innerHTML = renderTextoPlanoFallbackHTML(hitIdx);
+  }
+}
+
+// ── VISOR HTML: conserva encabezados, párrafos, listas y tablas básicas ─────
+function renderVisorHTML(hitIdx) {
+  const cont = document.getElementById('visor-body');
+  const hit = visorHits[hitIdx];
+  if (!visorFuente.htmlBruto) { cont.innerHTML = renderTextoPlanoFallbackHTML(hitIdx); return; }
+  const htmlResaltado = resaltarEnHTML(visorFuente.htmlBruto, hit.termino);
+  cont.innerHTML = `<div class="visor-word-html">${htmlResaltado}</div>`;
+  setTimeout(() => {
+    const el = document.querySelector('.visor-body mark.hit-actual');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 80);
+}
+
+// ── VISOR TXT/CSV/TSV/MD/JSON/XML: número de línea + fragmento ──────────────
+function renderVisorLineas(hitIdx) {
+  const hit = visorHits[hitIdx];
+  const pag = visorFuente.paginas.find(p => p.n === hit.pagina) || visorFuente.paginas[0] || { texto: '' };
+  const lineas = (pag.texto || '').split('\n');
+
+  let acumulado = 0, lineaObjetivo = 0;
+  for (let i = 0; i < lineas.length; i++) {
+    const len = lineas[i].length + 1;
+    if (hit.indice != null && hit.indice < acumulado + len) { lineaObjetivo = i; break; }
+    acumulado += len;
+  }
+
+  const radio = 18;
+  const ini = Math.max(0, lineaObjetivo - radio);
+  const fin = Math.min(lineas.length - 1, lineaObjetivo + radio);
+  let re; try { re = new RegExp(visorCifra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'); } catch (e) { re = null; }
+
+  const filas = [];
+  for (let i = ini; i <= fin; i++) {
+    const esHit = i === lineaObjetivo;
+    const escapado = esc(lineas[i] || '');
+    const contenido = re ? escapado.replace(re, m => `<mark class="hit-actual">${m}</mark>`) : escapado;
+    filas.push(`<div class="visor-linea${esHit ? ' linea-hit' : ''}"><span class="ln-num">${i + 1}</span><span class="ln-txt">${contenido}</span></div>`);
+  }
+
+  document.getElementById('visor-body').innerHTML = `<div>${filas.join('')}</div>`;
+  setTimeout(() => {
+    const el = document.querySelector('.visor-body .linea-hit');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 80);
+}
+
+// ── VISOR EXCEL: pestañas por hoja, letras de columna y números de fila ─────
+function renderVisorExcel(hitIdx) {
+  const hit = visorHits[hitIdx];
+  const hojaObj = visorFuente.hojas || {};
+  const hojas = Object.keys(hojaObj);
+  const hojaActiva = hit.hoja || hojas[0];
+
+  const tabsEl = document.getElementById('visor-tabs-hoja');
+  if (hojas.length > 1) {
+    tabsEl.style.display = 'flex';
+    tabsEl.innerHTML = hojas.map(h =>
+      `<div class="visor-tab-hoja${h === hojaActiva ? ' activa' : ''}" onclick="cambiarHojaVisor('${esc(h).replace(/'/g,"\\'")}',${hitIdx})">${esc(h)}</div>`
+    ).join('');
+  } else {
+    tabsEl.style.display = 'none';
+  }
+
+  renderTablaHoja(hojaActiva, hit);
+}
+
+function cambiarHojaVisor(nombreHoja, hitIdx) {
+  const hit = { ...visorHits[hitIdx], hoja: nombreHoja };
+  renderTablaHoja(nombreHoja, hit);
+  document.querySelectorAll('.visor-tab-hoja').forEach(t => {
+    t.classList.toggle('activa', t.textContent === nombreHoja);
+  });
+}
+
+// No se asume que la primera fila contiene encabezados: se muestran los datos
+// originales tal cual, con números de fila y letras de columna reales de Excel.
+function renderTablaHoja(nombreHoja, hit) {
+  const data = (visorFuente.hojas || {})[nombreHoja];
+  if (!data || data.length === 0) {
+    document.getElementById('visor-body').innerHTML =
+      '<div style="color:#9CA3AF;text-align:center;padding:24px;">Hoja vacía</div>';
+    return;
+  }
+
+  let patron; try { patron = new RegExp(visorCifra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'); } catch (e) { patron = null; }
+  const tieneCoordenada = hit && hit.hoja === nombreHoja && Number.isInteger(hit.fila) && Number.isInteger(hit.columna);
+  const numCols = Math.max(1, ...data.map(f => (f || []).length));
+  const letras = Array.from({ length: numCols }, (_, i) => colALetra(i));
+
+  const thead = `<thead><tr><th></th>${letras.map((l, ci) =>
+    `<th${tieneCoordenada && hit.columna === ci ? ' class="celda-hit"' : ''}>${l}</th>`).join('')}</tr></thead>`;
+
+  const tbody = data.map((fila, ri) => {
+    const esFilaObjetivo = tieneCoordenada && hit.fila === ri;
+    let filaTieneTexto = false;
+    const celdas = letras.map((_, ci) => {
+      const val = (fila || [])[ci];
+      const txt = (val === undefined || val === null) ? '' : String(val);
+      const esObjetivo = esFilaObjetivo && hit.columna === ci;
+      let esTexto = false;
+      if (patron && txt) { patron.lastIndex = 0; esTexto = patron.test(txt); patron.lastIndex = 0; }
+      if (esTexto) filaTieneTexto = true;
+
+      let contenido = esc(txt);
+      if (esObjetivo) contenido = `<strong style="color:#991B1B;background:#FEF08A;padding:1px 3px;border-radius:2px;">${esc(txt)}</strong>`;
+      else if (esTexto && patron) contenido = txt.replace(patron, m => `<strong style="color:#991B1B;background:#FEF08A;padding:0 2px;border-radius:2px;">${esc(m)}</strong>`);
+
+      return `<td${esObjetivo || esTexto ? ' class="celda-hit"' : ''}>${contenido}</td>`;
+    }).join('');
+
+    const cls = esFilaObjetivo ? 'fila-hit-actual' : (filaTieneTexto ? 'fila-hit' : '');
+    return `<tr class="${cls}"><td style="background:#F3F4F6;font-weight:700;color:#6B7280;text-align:right;">${ri + 1}</td>${celdas}</tr>`;
+  }).join('');
+
+  document.getElementById('visor-body').innerHTML =
+    `<div class="visor-tabla-wrap"><table class="visor-tabla">${thead}<tbody>${tbody}</tbody></table></div>`;
+
+  setTimeout(() => {
+    const el = document.querySelector('.visor-body .fila-hit-actual, .visor-body .fila-hit, .visor-body .celda-hit');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  }, 80);
+}
+
+// Navegación entre hits
+function actualizarNavHits(idx) {
+  const info = document.getElementById('visor-hit-info');
+  const prev = document.getElementById('btn-hit-prev');
+  const next = document.getElementById('btn-hit-next');
+  if (info) info.textContent = `Coincidencia ${idx+1} de ${visorHits.length}`;
+  if (prev) prev.disabled = idx === 0;
+  if (next) next.disabled = idx === visorHits.length - 1;
+  visorHitIdx = idx;
+}
+
+async function navHit(dir) {
+  const nuevoIdx = visorHitIdx + dir;
+  if (nuevoIdx < 0 || nuevoIdx >= visorHits.length) return;
+  await mostrarHitVisor(nuevoIdx);
+}
+
+// ── UTILS ────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── INICIO ───────────────────────────────────────────────────────────────────
+function iniciarApp() {
+  // Compatibilidad con registros de versiones anteriores (v16 y anteriores).
+  registros = registros.map(r => ({
+    tipo_fuente:'Sin especificar', respaldo_guardado:false,
+    unidad_periodo_verificados:false, consistencia_visual:false, consistencia_interna:false,
+    alertas_manual:[],
+    ubicacion_fuente: {
+      archivo: r?.fuente_seleccionada || r?.fuentes_encontradas || '',
+      tipo: '', pagina: null, pagina_estimada: null, hoja: null, celda: null,
+      fila: null, columna: null, fragmento: '', termino: '', tipo_coincidencia: '',
+      puntaje_contexto: null
+    },
+    fuente_revisada: false,
+    coincidencia_revisada: false,
+    ...r,
+    ubicacion_fuente: { archivo:'', tipo:'', pagina:null, pagina_estimada:null, hoja:null, celda:null, fila:null, columna:null, fragmento:'', termino:'', tipo_coincidencia:'', puntaje_contexto:null, ...(r?.ubicacion_fuente||{}) }
+  }));
+
+  // Renderizar panel colapsable de fuentes en revisión
+  renderPanelFuentes('panel-fuentes-revision', true);
+
+  renderRevisores();
+  actualizarStats();
+  renderLista();
+
+  // Inicializar drag & drop (debe ir al final para que el DOM esté listo)
+  initDrop();
+}
+
+// ── INTEGRACIÓN CON WORD (complemento / task pane) ──────────────────────────
+// Lee la frase que la persona auditora seleccionó en el documento de Word
+// abierto y la coloca en el campo de contexto, evitando tener que copiarla
+// manualmente. Si el campo de la cifra está vacío, intenta detectar un
+// número candidato dentro de esa misma selección.
+function usarSeleccionWord() {
+  if (typeof Office === 'undefined' || !Office.context || !Office.context.document) {
+    alert('Esta función solo está disponible cuando la herramienta se ejecuta como complemento dentro de Word.');
+    return;
+  }
+  Office.context.document.getSelectedDataAsync(Office.CoercionType.Text, (result) => {
+    if (result.status !== Office.AsyncResultStatus.Succeeded) {
+      alert('No fue posible leer la selección de Word. Seleccione una frase en el documento e intente de nuevo.');
+      return;
+    }
+    const texto = String(result.value || '').replace(/\s+/g, ' ').trim();
+    if (!texto) { alert('Seleccione primero una frase en el documento de Word.'); return; }
+
+    const inpCtx = document.getElementById('inp-ctx');
+    if (inpCtx) inpCtx.value = texto;
+
+    const inpCifra = document.getElementById('inp-cifra');
+    if (inpCifra && !inpCifra.value.trim()) {
+      const candidato = detectarPrimeraCifraEnTexto(texto);
+      if (candidato) inpCifra.value = candidato;
+    }
+    (inpCifra || inpCtx)?.focus();
+  });
+}
+
+// Busca, dentro de un texto, el primer fragmento que analizarCifra() puede
+// interpretar como número, porcentaje, proporción o monto. Solo se usa como
+// sugerencia inicial: la persona auditora siempre puede corregirla.
+function detectarPrimeraCifraEnTexto(texto) {
+  const candidatos = [
+    ...candidatosNumericosTexto(texto),
+    ...extraerCandidatosNumeroPalabras(texto)
+  ].sort((a, b) => a.indice - b.indice);
+  for (const c of candidatos) {
+    const analizado = analizarCifra(c.termino);
+    if (analizado && analizado.formas && analizado.formas.size > 0) return c.termino.trim();
+  }
+  return null;
+}
+
+// office.js exige inicializar mediante Office.onReady antes de usar cualquier
+// API de Office. Si el script no cargó (por ejemplo, al usarla como página
+// web independiente sin conexión a ese CDN), la herramienta sigue funcionando
+// igual, solo sin la integración con Word.
+if (typeof Office !== 'undefined' && Office.onReady) {
+  Office.onReady((info) => {
+    if (info && info.host) {
+      const btn = document.getElementById('btn-usar-seleccion');
+      if (btn) btn.style.display = 'inline-flex';
+    }
+    iniciarApp();
+  });
+} else {
+  iniciarApp();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "auditoria-addin",
+  "version": "1.0.1",
+  "description": "Complemento de Word: Auditoría de Cifras PEN (servidor de desarrollo local)",
+  "private": true,
+  "scripts": {
+    "start": "node devserver.js"
+  },
+  "dependencies": {
+    "office-addin-dev-certs": "^1.13.0"
+  }
+}
