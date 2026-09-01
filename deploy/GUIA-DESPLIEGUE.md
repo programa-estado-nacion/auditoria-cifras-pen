@@ -9,19 +9,22 @@ Resumen del flujo:
 
 ---
 
-## Parte A — Hospedar los archivos en Netlify (una vez, lo haces tú)
+## Parte A — Hospedar los archivos (ya está hecho)
 
-1. Crea una cuenta gratuita en https://www.netlify.com (recomendado, para que la URL sea estable).
-2. Entra a **https://app.netlify.com/drop**.
-3. Arrastra a esa página la carpeta **`src`** del proyecto
-   (`pen-auditoria-addin/src`). Netlify sube los archivos y te da una URL como
-   `https://nombre-aleatorio.netlify.app`.
-4. (Opcional) En *Site settings → Change site name* ponle un nombre claro, por ejemplo
-   `auditoria-cifras-pen`, y la URL será `https://auditoria-cifras-pen.netlify.app`.
-5. Comprueba que funciona abriendo en el navegador:
-   `https://TU-SITIO.netlify.app/taskpane.html` (debe cargar el panel).
+La interfaz del complemento se publica sola en **GitHub Pages** desde el repositorio
+`aguero-pen/auditoria-cifras-pen`. La URL es:
 
-> Privacidad: en Netlify solo viven los archivos de la interfaz (HTML/JS/CSS). Los
+```
+https://aguero-pen.github.io/auditoria-cifras-pen/
+```
+
+Cada vez que se sube un cambio a la rama `main`, GitHub vuelve a publicar el contenido de
+`src/` automáticamente. No hay que arrastrar carpetas ni hacer nada manual.
+
+Se puede comprobar abriendo en el navegador
+`https://aguero-pen.github.io/auditoria-cifras-pen/taskpane.html` (debe cargar el panel).
+
+> Privacidad: en GitHub Pages solo viven los archivos de la interfaz (HTML/JS/CSS). Los
 > documentos que se auditan **nunca salen de la computadora** de cada usuario; el
 > procesamiento es local dentro de Word.
 
@@ -29,10 +32,19 @@ Resumen del flujo:
 
 ## Parte B — Generar el manifiesto con tu URL
 
-En la carpeta `deploy/`, abre PowerShell y ejecuta (pon tu URL real):
+Ya hay uno generado y verificado en `deploy/manifest-produccion.xml`. Solo hace falta
+regenerarlo si cambia la URL de hospedaje.
+
+En Windows, desde la carpeta `deploy/` en PowerShell:
 
 ```
-.\configurar-url.ps1 -Url "https://TU-SITIO.netlify.app"
+.\configurar-url.ps1 -Url "https://aguero-pen.github.io/auditoria-cifras-pen"
+```
+
+En macOS o Linux:
+
+```
+./deploy/configurar-url.sh https://aguero-pen.github.io/auditoria-cifras-pen
 ```
 
 Esto crea **`manifest-produccion.xml`** ya apuntando a tu sitio. Ese es el archivo que
@@ -69,17 +81,30 @@ Listo: aparece el botón **Auditoría de cifras** y el panel funciona, sin conso
 
 ## Actualizaciones futuras
 
-Cuando mejores el complemento (por ejemplo, la tolerancia de redondeo), solo vuelves a
-**arrastrar la carpeta `src` a Netlify** (o *Deploys → Drag and drop* en tu sitio). Los
-usuarios reciben la versión nueva automáticamente al reabrir Word; **no reinstalan nada**.
-Solo tendrías que repartir un manifiesto nuevo si cambias la URL o agregas botones.
+Cuando mejores el complemento (por ejemplo, la tolerancia de redondeo), edita los
+archivos de `src/` y sube el cambio:
+
+```
+git add -A && git commit -m "descripción del cambio" && git push
+```
+
+GitHub publica la versión nueva en un par de minutos. Los usuarios la reciben
+automáticamente al reabrir Word; **no reinstalan nada**. Solo tendrías que repartir un
+manifiesto nuevo si cambias la URL o agregas botones.
+
+Como todo queda en el repositorio, siempre se puede ver qué cambió y volver a una versión
+anterior.
 
 ---
 
 ## Nota institucional (cuando lo quieras "de verdad" en el PEN)
 
-- **Servidor del CONARE en vez de Netlify:** hospeda el contenido de `src/` en un servidor
-  HTTPS interno y vuelve a generar el manifiesto con esa URL (Parte B). Todo lo demás igual.
+- **Dominio propio del PEN:** si se quiere una URL como `auditoria.estadonacion.or.cr`,
+  se configura como dominio personalizado en GitHub Pages (un registro CNAME) y se
+  regenera el manifiesto con esa URL (Parte B). Todo lo demás igual.
+- **Servidor del CONARE en vez de GitHub Pages:** hospeda el contenido de `src/` en un
+  servidor HTTPS interno con certificado válido y vuelve a generar el manifiesto con esa
+  URL. Ojo: el certificado debe ser de una autoridad en la que Word confíe.
 - **Despliegue centralizado:** si consigues un administrador de Microsoft 365, puede subir
   `manifest-produccion.xml` en *Centro de administración → Aplicaciones integradas* y
   asignarlo a grupos; entonces a la gente le **aparece solo**, sin la Parte D. Es el paso
