@@ -2540,6 +2540,20 @@ function resaltarFragmento(fragmento, termino, palabras) {
   return out;
 }
 
+function resaltarTextoSeguro(texto, patron) {
+  const valor = String(texto ?? '');
+  if (!patron) return esc(valor);
+  let salida = '', posicion = 0, coincidencia;
+  patron.lastIndex = 0;
+  while ((coincidencia = patron.exec(valor)) !== null) {
+    salida += esc(valor.slice(posicion, coincidencia.index));
+    salida += `<strong style="color:#991B1B;background:#FEF08A;padding:0 2px;border-radius:2px;">${esc(coincidencia[0])}</strong>`;
+    posicion = coincidencia.index + coincidencia[0].length;
+    if (coincidencia[0].length === 0) patron.lastIndex++;
+  }
+  return salida + esc(valor.slice(posicion));
+}
+
 // "Usar esta fuente": respalda el documento completo sin fijar una coincidencia puntual.
 function seleccionarFuente(indice) {
   coincidenciaSeleccionada = null;
@@ -3426,11 +3440,13 @@ function zoomVisor(dir) {
 function resaltarEnHTML(html, termino) {
   const div = document.createElement('div');
   div.innerHTML = html || '';
-  div.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(el => el.remove());
+  div.querySelectorAll('script,style,iframe,object,embed,link,meta,svg,math,form,input,button,textarea,select').forEach(el => el.remove());
   div.querySelectorAll('*').forEach(el => {
     [...el.attributes].forEach(attr => {
-      if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
-      if ((attr.name === 'href' || attr.name === 'src') && /^\s*javascript:/i.test(attr.value)) el.removeAttribute(attr.name);
+      const nombre = attr.name.toLowerCase();
+      if (/^on/i.test(nombre) || ['src','srcset','href','xlink:href','style','srcdoc','poster','data','formaction','action'].includes(nombre)) {
+        el.removeAttribute(attr.name);
+      }
     });
   });
 
@@ -3671,7 +3687,7 @@ function renderTablaHoja(nombreHoja, hit) {
 
       let contenido = esc(txt);
       if (esObjetivo) contenido = `<strong style="color:#991B1B;background:#FEF08A;padding:1px 3px;border-radius:2px;">${esc(txt)}</strong>`;
-      else if (esTexto && patron) contenido = txt.replace(patron, m => `<strong style="color:#991B1B;background:#FEF08A;padding:0 2px;border-radius:2px;">${esc(m)}</strong>`);
+      else if (esTexto && patron) contenido = resaltarTextoSeguro(txt, patron);
 
       return `<td${esObjetivo || esTexto ? ' class="celda-hit"' : ''}>${contenido}</td>`;
     }).join('');
