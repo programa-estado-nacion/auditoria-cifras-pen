@@ -22,7 +22,7 @@
 
   <Requirements>
     <Sets DefaultMinVersion="1.3">
-      <Set Name="WordApi" MinVersion="1.3"/>
+      <Set Name="WordApi" MinVersion="1.4"/>
     </Sets>
   </Requirements>
 
