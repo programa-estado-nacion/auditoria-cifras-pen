@@ -696,16 +696,57 @@ if (typeof pdfjsLib !== 'undefined') {
 }
 
 // ── ESTADO ──────────────────────────────────────────────────────────────────
+function leerJSONLocal(clave, valorPredeterminado) {
+  try {
+    const texto = localStorage.getItem(clave);
+    return texto == null ? valorPredeterminado : JSON.parse(texto);
+  } catch (e) {
+    console.warn(`No se pudo leer ${clave} desde el almacenamiento local.`, e);
+    return valorPredeterminado;
+  }
+}
+
+function sanearRegistros(valor) {
+  if (!Array.isArray(valor)) return [];
+  const ids = new Set();
+  return valor.filter(r => r && typeof r === 'object' && !Array.isArray(r)).map((r, indice) => {
+    let id = String(r.id ?? '').trim();
+    if (!id || ids.has(id)) {
+      id = `legacy-${indice + 1}`;
+      while (ids.has(id)) id += '-';
+    }
+    ids.add(id);
+    return {
+      ...r,
+      id,
+      cifra: String(r.cifra ?? ''),
+      contexto: String(r.contexto ?? ''),
+      revisor: String(r.revisor ?? 'Sin asignar'),
+      fecha: String(r.fecha ?? ''),
+    };
+  });
+}
+
+function calcularContador(lista) {
+  return lista.reduce((max, r) => {
+    const numero = Number.parseInt(r.id, 10);
+    return Number.isFinite(numero) ? Math.max(max, numero) : max;
+  }, 0);
+}
+
+function sanearRevisores(valor) {
+  if (!Array.isArray(valor)) return [];
+  return valor
+    .map(x => String(x || '').replace(/\s+/g, ' ').trim())
+    .filter((x, i, arr) => x && arr.findIndex(y => y.toLocaleLowerCase('es') === x.toLocaleLowerCase('es')) === i);
+}
+
 let fuentes   = [];
-let registros = JSON.parse(localStorage.getItem('en_auditoria') || '[]');
-let revisores = JSON.parse(localStorage.getItem('en_revisores') || '[]');
-if (!Array.isArray(revisores)) revisores = [];
-revisores = revisores
-  .map(x => String(x || '').replace(/\s+/g, ' ').trim())
-  .filter((x, i, arr) => x && arr.findIndex(y => y.toLocaleLowerCase('es') === x.toLocaleLowerCase('es')) === i);
+let registros = sanearRegistros(leerJSONLocal('en_auditoria', []));
+let revisores = sanearRevisores(leerJSONLocal('en_revisores', []));
 let expandido = null;
 let semActual = null;
-let contador  = registros.length > 0 ? Math.max(...registros.map(r=>parseInt(r.id))) : 0;
+let contador  = calcularContador(registros);
 let ultimasBusquedas = [];
 let fuenteSeleccionada = '';
 let coincidenciaSeleccionada = null; // ubicación exacta elegida dentro de una fuente (v17)
@@ -718,8 +759,7 @@ let alertasManualActual = [];
 // ── ESTADO DE REVISIÓN PERSISTENTE (v17) ────────────────────────────────────
 // Recuerda qué fuentes y qué coincidencias ya fueron inspeccionadas por la
 // persona auditora, para la misma cifra + contexto + archivo.
-let estadoRevision = {};
-try { estadoRevision = JSON.parse(localStorage.getItem('en_estado_revision') || '{}'); } catch(e) { estadoRevision = {}; }
+let estadoRevision = leerJSONLocal('en_estado_revision', {});
 if (!estadoRevision || typeof estadoRevision !== 'object') estadoRevision = {};
 
 function guardarEstadoRevision() {
@@ -745,20 +785,22 @@ function _hayWordSettings() {
   return typeof Office !== 'undefined' && Office.context && Office.context.document && Office.context.document.settings;
 }
 
-function guardarEnWordSettings(clave, valor) {
+function guardarEnWordSettings(clave, valor, inmediato = false) {
   if (!_hayWordSettings()) return;
   try {
     Office.context.document.settings.set(clave, JSON.stringify(valor));
     // saveAsync se agrupa (debounce) para no saturar a Word con guardados
     // seguidos cuando se marcan varias cifras revisadas rápidamente.
     clearTimeout(_guardadoWordPendiente);
-    _guardadoWordPendiente = setTimeout(() => {
+    const persistir = () => {
       Office.context.document.settings.saveAsync((res) => {
         if (res.status !== Office.AsyncResultStatus.Succeeded) {
           console.warn('No se pudo guardar el progreso dentro del documento de Word.', res.error);
         }
       });
-    }, 600);
+    };
+    if (inmediato) persistir();
+    else _guardadoWordPendiente = setTimeout(persistir, 600);
   } catch(e) { console.warn('Error guardando en Office.context.document.settings', e); }
 }
 
@@ -768,33 +810,41 @@ function guardarEnWordSettings(clave, valor) {
 // vez que se usa el complemento en este documento, guarda ahí lo que ya
 // hubiera en el navegador para que de ahora en adelante quede ligado al
 // documento y no al navegador.
+function leerJSONWord(clave, valorPredeterminado) {
+  try {
+    const guardado = Office.context.document.settings.get(clave);
+    if (guardado == null) return { presente: false, valor: valorPredeterminado };
+    const valor = typeof guardado === 'string' ? JSON.parse(guardado) : guardado;
+    return { presente: true, valor };
+  } catch (e) {
+    console.warn(`No se pudo leer ${clave} desde el documento de Word.`, e);
+    return { presente: false, valor: valorPredeterminado };
+  }
+}
+
 function cargarDesdeWordSettingsAlIniciar() {
   if (!_hayWordSettings()) return;
-  let huboDatos = false;
+  const auditoriaWord = leerJSONWord('en_auditoria', []);
+  const revisoresWord = leerJSONWord('en_revisores', []);
+  const estadoWord = leerJSONWord('en_estado_revision', {});
+
+  // Un documento sin auditoría propia debe comenzar vacío; nunca hereda
+  // registros de otro archivo a través del localStorage del navegador.
+  registros = auditoriaWord.presente ? sanearRegistros(auditoriaWord.valor) : [];
+  contador = calcularContador(registros);
+  if (revisoresWord.presente) revisores = sanearRevisores(revisoresWord.valor);
+  estadoRevision = estadoWord.presente && estadoWord.valor && typeof estadoWord.valor === 'object'
+    ? estadoWord.valor : {};
+
   try {
-    const auditoriaWord = Office.context.document.settings.get('en_auditoria');
-    const revisoresWord = Office.context.document.settings.get('en_revisores');
-    const estadoWord = Office.context.document.settings.get('en_estado_revision');
-    if (auditoriaWord != null) {
-      registros = JSON.parse(auditoriaWord) || [];
-      contador = registros.length > 0 ? Math.max(...registros.map(r => parseInt(r.id))) : 0;
-      huboDatos = true;
-    }
-    if (revisoresWord != null) { revisores = JSON.parse(revisoresWord) || []; huboDatos = true; }
-    if (estadoWord != null) { estadoRevision = JSON.parse(estadoWord) || {}; huboDatos = true; }
-  } catch(e) { console.warn('Error leyendo el progreso guardado en el documento de Word.', e); }
-  if (huboDatos) {
-    try {
-      localStorage.setItem('en_auditoria', JSON.stringify(registros));
-      localStorage.setItem('en_revisores', JSON.stringify(revisores));
-      localStorage.setItem('en_estado_revision', JSON.stringify(estadoRevision));
-    } catch(e) {}
-    iniciarApp();
-  } else {
-    guardarEnWordSettings('en_auditoria', registros);
-    guardarEnWordSettings('en_revisores', revisores);
-    guardarEnWordSettings('en_estado_revision', estadoRevision);
-  }
+    localStorage.setItem('en_auditoria', JSON.stringify(registros));
+    localStorage.setItem('en_revisores', JSON.stringify(revisores));
+    localStorage.setItem('en_estado_revision', JSON.stringify(estadoRevision));
+  } catch(e) {}
+
+  if (!auditoriaWord.presente) guardarEnWordSettings('en_auditoria', registros);
+  if (!revisoresWord.presente) guardarEnWordSettings('en_revisores', revisores);
+  if (!estadoWord.presente) guardarEnWordSettings('en_estado_revision', estadoRevision);
 }
 
 // Huella de un archivo: nombre + fecha de última modificación (evita confundir
@@ -2952,9 +3002,9 @@ function limpiar() {
   document.getElementById('resultados-busqueda').innerHTML='';
 }
 
-function guardar() {
+function guardar(inmediato = false) {
   try { localStorage.setItem('en_auditoria', JSON.stringify(registros)); } catch(e) {}
-  guardarEnWordSettings('en_auditoria', registros);
+  guardarEnWordSettings('en_auditoria', registros, inmediato);
 }
 
 // ── STATS ────────────────────────────────────────────────────────────────────
@@ -2978,6 +3028,10 @@ function actualizarStats() {
     const pend=t-v-a-r;
     document.getElementById('h-prog-lbl').textContent=
       (v+a+r)+' de '+t+' revisadas'+(pend>0?' · '+pend+' sin marcar':'');
+  } else {
+    document.getElementById('h-prog').style.display='none';
+    document.getElementById('h-prog-track').innerHTML='';
+    document.getElementById('h-prog-lbl').textContent='';
   }
 }
 
@@ -3103,7 +3157,7 @@ function eliminar(id) {
   if (!confirm('¿Eliminar este registro?')) return;
   registros=registros.filter(r=>r.id!==id);
   if (expandido===id) expandido=null;
-  guardar(); actualizarStats(); renderLista();
+  guardar(true); actualizarStats(); renderLista();
 }
 
 // ── REPORTE ──────────────────────────────────────────────────────────────────
@@ -3742,8 +3796,8 @@ if (typeof Office !== 'undefined' && Office.onReady) {
       const btn = document.getElementById('btn-usar-seleccion');
       if (btn) btn.style.display = 'inline-flex';
     }
-    iniciarApp();
     cargarDesdeWordSettingsAlIniciar();
+    iniciarApp();
   });
 } else {
   iniciarApp();
