@@ -18,6 +18,11 @@ las cifras de un informe contra sus documentos fuente y dejar registro de la rev
 Incluye un visor que muestra la coincidencia resaltada dentro del PDF, Word o Excel
 original, con navegación entre coincidencias.
 
+El avance se conserva dentro del propio documento de Word, además de la copia local del
+navegador, por lo que acompaña al `.docx` entre sesiones y computadoras. Al registrar una
+cifra, el complemento también agrega un comentario nativo de Word con el resultado, la
+fuente y la fecha de revisión.
+
 > **Privacidad.** Los documentos que se auditan nunca salen de la computadora: el
 > procesamiento ocurre dentro de Word. Lo que se hospeda es solo la interfaz.
 
@@ -46,6 +51,8 @@ llavero. Si se cancela, los certificados quedan generados en `~/.office-addin-de
 y se puede reintentar con `npx office-addin-dev-certs install`.
 
 Para probarlo dentro de Word, se carga `manifest.xml` (sideload).
+
+La versión 19.1 requiere WordApi 1.4 para insertar comentarios nativos.
 
 ## Publicación
 
