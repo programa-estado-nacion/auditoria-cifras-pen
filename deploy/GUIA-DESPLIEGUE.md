@@ -24,6 +24,9 @@ Cada vez que se sube un cambio a la rama `main`, GitHub vuelve a publicar el con
 Se puede comprobar abriendo en el navegador
 `https://programa-estado-nacion.github.io/auditoria-cifras-pen/taskpane.html` (debe cargar el panel).
 
+El despliegue también genera el manifiesto público en
+`https://programa-estado-nacion.github.io/auditoria-cifras-pen/manifest.xml`.
+
 > Privacidad: en GitHub Pages solo viven los archivos de la interfaz (HTML/JS/CSS). Los
 > documentos que se auditan **nunca salen de la computadora** de cada usuario; el
 > procesamiento es local dentro de Word.

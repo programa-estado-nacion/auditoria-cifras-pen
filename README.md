@@ -56,8 +56,12 @@ La versión 19.1 requiere WordApi 1.4 para insertar comentarios nativos.
 
 ## Publicación
 
-`src/` se publica automáticamente en **GitHub Pages** con cada push a `main`
-(ver `.github/workflows/pages.yml`).
+`src/` y el manifiesto de producción se publican automáticamente en **GitHub Pages** con
+cada push a `main` (ver `.github/workflows/pages.yml`). El manifiesto público queda en:
+
+```text
+https://programa-estado-nacion.github.io/auditoria-cifras-pen/manifest.xml
+```
 
 Para regenerar el manifiesto de producción:
 
