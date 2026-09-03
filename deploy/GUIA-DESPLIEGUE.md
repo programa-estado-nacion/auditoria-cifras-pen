@@ -5,7 +5,7 @@ servidor**. Se hospedan los archivos una sola vez y se reparte por **carpeta com
 Cada persona lo instala una vez con unos clics y le queda el botón en Word.
 
 Resumen del flujo:
-`Hospedar en Netlify (1 vez)` → `Generar manifiesto con la URL` → `Poner el manifiesto en una carpeta compartida` → `Cada persona agrega el catálogo (1 vez)`.
+`Publicar en GitHub Pages` → `Descargar el manifiesto` → `Poner el manifiesto en una carpeta compartida` → `Cada persona agrega el catálogo (1 vez)`.
 
 ---
 

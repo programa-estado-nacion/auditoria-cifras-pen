@@ -1,5 +1,5 @@
 # Genera manifest-produccion.xml a partir de manifest.prod.xml, insertando tu URL.
-# Uso:  .\configurar-url.ps1 -Url "https://tu-sitio.netlify.app"
+# Uso:  .\configurar-url.ps1 -Url "https://programa-estado-nacion.github.io/auditoria-cifras-pen"
 param([Parameter(Mandatory=$true)][string]$Url)
 $Url = $Url.TrimEnd('/')
 $src = Join-Path $PSScriptRoot 'manifest.prod.xml'
