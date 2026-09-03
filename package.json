@@ -1,6 +1,6 @@
 {
   "name": "auditoria-addin",
-  "version": "1.0.1",
+  "version": "1.0.5",
   "description": "Complemento de Word: Auditoría de Cifras PEN (servidor de desarrollo local)",
   "private": true,
   "scripts": {

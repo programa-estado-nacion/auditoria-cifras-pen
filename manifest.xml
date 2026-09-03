@@ -7,7 +7,7 @@
   xsi:type="TaskPaneApp">
 
   <Id>03624901-885b-42c6-9c0e-fa981703f0f0</Id>
-  <Version>1.0.4.0</Version>
+  <Version>1.0.5.0</Version>
   <ProviderName>Programa Estado de la Nación</ProviderName>
   <DefaultLocale>es-CR</DefaultLocale>
   <DisplayName DefaultValue="Auditoría de Cifras PEN"/>
