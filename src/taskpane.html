@@ -724,6 +724,77 @@ if (!estadoRevision || typeof estadoRevision !== 'object') estadoRevision = {};
 
 function guardarEstadoRevision() {
   try { localStorage.setItem('en_estado_revision', JSON.stringify(estadoRevision)); } catch(e) {}
+  guardarEnWordSettings('en_estado_revision', estadoRevision);
+}
+
+// ── PERSISTENCIA EN EL DOCUMENTO DE WORD (v19) ─────────────────────────────
+// localStorage vive en el navegador, y Word Online carga este panel dentro de
+// un iframe de otro origen (netlify.app dentro de office.com/live.com).
+// Varios navegadores (Edge, Safari, Chrome con protección de rastreo) aíslan
+// o borran ese almacenamiento entre sesiones, al cerrar el panel por
+// inactividad, o simplemente no viaja con el documento a otra computadora.
+// Por eso, además de localStorage, guardamos una copia dentro del propio
+// archivo .docx usando Office.context.document.settings. Al abrir el
+// documento, si Word trae datos guardados, tienen prioridad sobre lo que haya
+// en el navegador, porque son los que de verdad pertenecen a ese documento.
+// Límite a tener en cuenta: la Settings API de Word admite hasta ~2 MB por
+// documento; en auditorías con muchísimos registros conviene vigilar esto.
+let _guardadoWordPendiente = null;
+
+function _hayWordSettings() {
+  return typeof Office !== 'undefined' && Office.context && Office.context.document && Office.context.document.settings;
+}
+
+function guardarEnWordSettings(clave, valor) {
+  if (!_hayWordSettings()) return;
+  try {
+    Office.context.document.settings.set(clave, JSON.stringify(valor));
+    // saveAsync se agrupa (debounce) para no saturar a Word con guardados
+    // seguidos cuando se marcan varias cifras revisadas rápidamente.
+    clearTimeout(_guardadoWordPendiente);
+    _guardadoWordPendiente = setTimeout(() => {
+      Office.context.document.settings.saveAsync((res) => {
+        if (res.status !== Office.AsyncResultStatus.Succeeded) {
+          console.warn('No se pudo guardar el progreso dentro del documento de Word.', res.error);
+        }
+      });
+    }, 600);
+  } catch(e) { console.warn('Error guardando en Office.context.document.settings', e); }
+}
+
+// Se ejecuta una sola vez, después de Office.onReady. Si el documento ya
+// trae datos guardados de una sesión anterior, reemplaza lo que se haya
+// cargado de localStorage y vuelve a pintar la interfaz. Si es la primera
+// vez que se usa el complemento en este documento, guarda ahí lo que ya
+// hubiera en el navegador para que de ahora en adelante quede ligado al
+// documento y no al navegador.
+function cargarDesdeWordSettingsAlIniciar() {
+  if (!_hayWordSettings()) return;
+  let huboDatos = false;
+  try {
+    const auditoriaWord = Office.context.document.settings.get('en_auditoria');
+    const revisoresWord = Office.context.document.settings.get('en_revisores');
+    const estadoWord = Office.context.document.settings.get('en_estado_revision');
+    if (auditoriaWord != null) {
+      registros = JSON.parse(auditoriaWord) || [];
+      contador = registros.length > 0 ? Math.max(...registros.map(r => parseInt(r.id))) : 0;
+      huboDatos = true;
+    }
+    if (revisoresWord != null) { revisores = JSON.parse(revisoresWord) || []; huboDatos = true; }
+    if (estadoWord != null) { estadoRevision = JSON.parse(estadoWord) || {}; huboDatos = true; }
+  } catch(e) { console.warn('Error leyendo el progreso guardado en el documento de Word.', e); }
+  if (huboDatos) {
+    try {
+      localStorage.setItem('en_auditoria', JSON.stringify(registros));
+      localStorage.setItem('en_revisores', JSON.stringify(revisores));
+      localStorage.setItem('en_estado_revision', JSON.stringify(estadoRevision));
+    } catch(e) {}
+    iniciarApp();
+  } else {
+    guardarEnWordSettings('en_auditoria', registros);
+    guardarEnWordSettings('en_revisores', revisores);
+    guardarEnWordSettings('en_estado_revision', estadoRevision);
+  }
 }
 
 // Huella de un archivo: nombre + fecha de última modificación (evita confundir
@@ -2704,6 +2775,7 @@ function siNo(v) { return v ? 'Sí' : 'No'; }
 // ── REVISORES PERSONALIZADOS ─────────────────────────────────────────────────
 function guardarRevisores() {
   try { localStorage.setItem('en_revisores', JSON.stringify(revisores)); } catch(e) {}
+  guardarEnWordSettings('en_revisores', revisores);
 }
 
 function opcionesRevisorHTML(seleccionado='Sin asignar') {
@@ -2848,6 +2920,7 @@ function limpiar() {
 
 function guardar() {
   try { localStorage.setItem('en_auditoria', JSON.stringify(registros)); } catch(e) {}
+  guardarEnWordSettings('en_auditoria', registros);
 }
 
 // ── STATS ────────────────────────────────────────────────────────────────────
@@ -3636,6 +3709,7 @@ if (typeof Office !== 'undefined' && Office.onReady) {
       if (btn) btn.style.display = 'inline-flex';
     }
     iniciarApp();
+    cargarDesdeWordSettingsAlIniciar();
   });
 } else {
   iniciarApp();
