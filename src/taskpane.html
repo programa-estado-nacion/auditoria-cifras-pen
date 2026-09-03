@@ -5,11 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Auditoría de Cifras PEN</title>
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png"/>
-  <script src="vendor/mammoth.browser.min.js"></script>
-  <script src="vendor/pdf.min.js"></script>
-  <script src="vendor/xlsx.full.min.js"></script>
-  <!-- Requerido para funcionar como complemento (task pane) de Word, incluido Word en línea. -->
+  <!-- office.js debe ser el PRIMER script de la página. Mientras no termina su
+       handshake con el host, Office mantiene el panel oculto; si se carga
+       detrás de otros scripts pesados, Word en línea agota la espera y el
+       panel se queda en blanco. Los vendor van con `defer` para no bloquear
+       ese arranque: quedan listos antes de DOMContentLoaded, que es cuando
+       esta aplicación los usa. -->
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script defer src="vendor/mammoth.browser.min.js"></script>
+  <script defer src="vendor/pdf.min.js"></script>
+  <script defer src="vendor/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Arial, sans-serif; background: #F2EFE9; color: #2C2C2C; font-size: 14px; min-height: 100vh; }
@@ -435,6 +440,16 @@
       .visor-layout { flex-direction:column; max-height:none; }
       .visor-panel-lateral { width:auto; border-left:none; border-top:1px solid #D9D4C8; }
     }
+
+    /* DIÁLOGOS DEL PANEL (sustituyen a alert/confirm, no admitidos en Office) */
+    .dlg-fondo { position: fixed; inset: 0; background: rgba(27,43,75,.55); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 9999; }
+    .dlg-caja { background: #fff; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.35); max-width: 460px; width: 100%; padding: 22px 24px 18px; }
+    .dlg-texto { font-size: 14px; line-height: 1.55; color: #2C2C2C; white-space: pre-wrap; word-break: break-word; max-height: 50vh; overflow: auto; }
+    .dlg-botones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    .dlg-btn { font: inherit; font-size: 13px; font-weight: 600; padding: 9px 18px; border-radius: 6px; border: 1px solid #D1D5DB; background: #fff; color: #374151; cursor: pointer; }
+    .dlg-btn:hover { background: #F3F4F6; }
+    .dlg-btn-primario { background: #1B2B4B; border-color: #1B2B4B; color: #fff; }
+    .dlg-btn-primario:hover { background: #243964; }
   </style>
 </head>
 <body>
@@ -691,9 +706,71 @@
 </div>
 
 <script>
-if (typeof pdfjsLib !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'vendor/pdf.worker.min.js';
+// ── DIÁLOGOS DEL PANEL ──────────────────────────────────────────────────────
+// Office no admite window.alert, window.confirm ni window.prompt dentro de un
+// panel de tareas. En Word devuelven undefined sin mostrar nada, así que el
+// patrón «if (!confirm(...)) return;» cancelaba siempre la acción y los avisos
+// de error desaparecían en silencio. Estos diálogos los reemplazan dibujándose
+// dentro del propio panel.
+
+// Se construyen con nodos de texto, nunca con innerHTML: los mensajes incluyen
+// nombres de archivo y de revisores escritos por la persona usuaria.
+function _construirDialogo(mensaje, botones) {
+  const fondo = document.createElement('div');
+  fondo.className = 'dlg-fondo';
+  const caja = document.createElement('div');
+  caja.className = 'dlg-caja';
+  caja.setAttribute('role', 'alertdialog');
+  caja.setAttribute('aria-modal', 'true');
+
+  const texto = document.createElement('div');
+  texto.className = 'dlg-texto';
+  texto.textContent = String(mensaje == null ? '' : mensaje);
+
+  const fila = document.createElement('div');
+  fila.className = 'dlg-botones';
+  botones.forEach(b => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dlg-btn' + (b.primario ? ' dlg-btn-primario' : '');
+    btn.textContent = b.etiqueta;
+    btn.addEventListener('click', b.alPulsar);
+    fila.appendChild(btn);
+  });
+
+  caja.append(texto, fila);
+  fondo.appendChild(caja);
+  document.body.appendChild(fondo);
+  const primero = fila.querySelector('.dlg-btn-primario') || fila.querySelector('.dlg-btn');
+  if (primero) primero.focus();
+  return { fondo, caja };
+}
+
+function avisar(mensaje) {
+  return new Promise(resolver => {
+    let dlg;
+    const cerrar = () => { dlg.fondo.remove(); document.removeEventListener('keydown', alTeclear); resolver(); };
+    const alTeclear = ev => { if (ev.key === 'Escape' || ev.key === 'Enter') { ev.preventDefault(); cerrar(); } };
+    dlg = _construirDialogo(mensaje, [{ etiqueta: 'Entendido', primario: true, alPulsar: cerrar }]);
+    document.addEventListener('keydown', alTeclear);
+  });
+}
+
+function confirmar(mensaje, etiquetaAceptar = 'Sí, continuar') {
+  return new Promise(resolver => {
+    let dlg;
+    const cerrar = (respuesta) => {
+      dlg.fondo.remove();
+      document.removeEventListener('keydown', alTeclear);
+      resolver(respuesta);
+    };
+    const alTeclear = ev => { if (ev.key === 'Escape') { ev.preventDefault(); cerrar(false); } };
+    dlg = _construirDialogo(mensaje, [
+      { etiqueta: 'Cancelar', primario: false, alPulsar: () => cerrar(false) },
+      { etiqueta: etiquetaAceptar, primario: true, alPulsar: () => cerrar(true) }
+    ]);
+    document.addEventListener('keydown', alTeclear);
+  });
 }
 
 // ── ESTADO ──────────────────────────────────────────────────────────────────
@@ -1058,9 +1135,9 @@ function quitarFuente(id) {
   sincronizarPaneles();
 }
 
-function quitarTodas() {
+async function quitarTodas() {
   if (fuentes.length===0) return;
-  if (!confirm('¿Quitar todos los documentos fuente cargados?')) return;
+  if (!await confirmar('¿Quitar todos los documentos fuente cargados?', 'Sí, quitar todos')) return;
   fuentes = [];
   sincronizarPaneles();
 }
@@ -1189,7 +1266,7 @@ function agregarACola(filesRaw) {
   const compatibles = filtrarCompatibles(filesRaw);
   const demasiadoGrandes = compatibles.filter(f => f.size > MAX_ARCHIVO_BYTES);
   if (demasiadoGrandes.length > 0) {
-    alert(`No se agregaron ${demasiadoGrandes.length} archivo(s) de más de 50 MB:\n${demasiadoGrandes.map(f => f.name).join('\n')}`);
+    avisar(`No se agregaron ${demasiadoGrandes.length} archivo(s) de más de 50 MB:\n${demasiadoGrandes.map(f => f.name).join('\n')}`);
   }
   const nuevos = compatibles.filter(f => f.size <= MAX_ARCHIVO_BYTES);
   if (nuevos.length === 0) return;
@@ -1297,7 +1374,7 @@ async function procesarCola() {
 
   if (errores.length > 0) {
     console.warn('No se pudieron leer:', errores);
-    alert(`No fue posible leer ${errores.length} archivo(s):\n${errores.join('\n')}\n\nCompruebe el formato y vuelva a intentarlo.`);
+    avisar(`No fue posible leer ${errores.length} archivo(s):\n${errores.join('\n')}\n\nCompruebe el formato y vuelva a intentarlo.`);
   }
 }
 
@@ -1661,16 +1738,16 @@ function buscar() {
   const cifra = document.getElementById('inp-cifra').value.trim();
   const ctx   = document.getElementById('inp-ctx').value.trim();
   const cap   = document.getElementById('inp-cap').value.trim();
-  if (!cifra) { alert('Ingrese la cifra antes de buscar.'); return; }
-  if (!ctx)   { alert('Ingrese el contexto donde aparece la cifra.'); return; }
+  if (!cifra) { avisar('Ingrese la cifra antes de buscar.'); return; }
+  if (!ctx)   { avisar('Ingrese el contexto donde aparece la cifra.'); return; }
   if (fuentes.length===0) {
-    alert('No hay documentos fuente cargados.\nVaya al panel de fuentes y cargue los documentos primero.');
+    avisar('No hay documentos fuente cargados.\nVaya al panel de fuentes y cargue los documentos primero.');
     return;
   }
 
   const cifraObjetivo = analizarCifra(cifra);
   if (!cifraObjetivo || cifraObjetivo.formas.size === 0) {
-    alert('No fue posible interpretar la cifra. Puede usar números, números en palabras, proporciones o monedas; por ejemplo: -44%, uno de cada cinco, veintitrés millones, 4.200 colones o US$1,234.50.');
+    avisar('No fue posible interpretar la cifra. Puede usar números, números en palabras, proporciones o monedas; por ejemplo: -44%, uno de cada cinco, veintitrés millones, 4.200 colones o US$1,234.50.');
     return;
   }
 
@@ -2629,12 +2706,12 @@ async function insertarComentarioWordSiCorresponde(textoCifra, mensaje) {
   }
 }
 
-function toggleFuenteRevisada(ri, checked) {
+async function toggleFuenteRevisada(ri, checked) {
   const r = ultimasBusquedas[ri];
   if (!r) return;
   const huella = r.fuente.huella || r.fuente.nombre;
   if (checked) {
-    if (!confirm('¿Desea marcar como revisadas todas las coincidencias de esta fuente?')) {
+    if (!await confirmar('¿Desea marcar como revisadas todas las coincidencias de esta fuente?', 'Sí, marcar todas')) {
       renderResultados(document.getElementById('inp-cifra').value.trim(), ultimasBusquedas, resumenBusquedaActual);
       return;
     }
@@ -2937,10 +3014,10 @@ function agregarRevisor() {
   renderLista();
 }
 
-function eliminarRevisor(indice) {
+async function eliminarRevisor(indice) {
   const nombre = revisores[indice];
   if (nombre === undefined) return;
-  if (!confirm(`¿Quitar a "${nombre}" de la lista de revisores?\n\nLos registros ya asignados conservarán ese nombre.`)) return;
+  if (!await confirmar(`¿Quitar a "${nombre}" de la lista de revisores?\n\nLos registros ya asignados conservarán ese nombre.`, 'Sí, quitar')) return;
 
   revisores.splice(indice, 1);
   guardarRevisores();
@@ -2959,10 +3036,10 @@ function selSem(btn) {
 function registrar() {
   const cifra = document.getElementById('inp-cifra').value.trim();
   const ctx   = document.getElementById('inp-ctx').value.trim();
-  if (!cifra||!ctx)   { alert('Complete la cifra y el contexto.'); return; }
-  if (!semActual)     { alert('Seleccione un resultado en el semáforo.'); return; }
+  if (!cifra||!ctx)   { avisar('Complete la cifra y el contexto.'); return; }
+  if (!semActual)     { avisar('Seleccione un resultado en el semáforo.'); return; }
   if (!fuenteSeleccionada) {
-    alert('Seleccione una sola fuente para registrar, o marque “Ninguna de estas / no encontrada”.');
+    avisar('Seleccione una sola fuente para registrar, o marque “Ninguna de estas / no encontrada”.');
     return;
   }
 
@@ -3177,8 +3254,8 @@ function upd(id,campo,valor) {
   guardar(); actualizarStats();
   if (['semaforo','revisor','fuente_seleccionada','tipo_fuente','respaldo_guardado','unidad_periodo_verificados','consistencia_visual','consistencia_interna'].includes(campo)) renderLista();
 }
-function eliminar(id) {
-  if (!confirm('¿Eliminar este registro?')) return;
+async function eliminar(id) {
+  if (!await confirmar('¿Eliminar este registro?', 'Sí, eliminar')) return;
   registros=registros.filter(r=>r.id!==id);
   if (expandido===id) expandido=null;
   guardar(true); actualizarStats(); renderLista();
@@ -3187,7 +3264,7 @@ function eliminar(id) {
 // ── REPORTE ──────────────────────────────────────────────────────────────────
 function abrirReporte() {
   const t=registros.length;
-  if (t===0) { alert('No hay registros aún.'); return; }
+  if (t===0) { avisar('No hay registros aún.'); return; }
   const v=registros.filter(r=>r.semaforo==='verde').length;
   const a=registros.filter(r=>r.semaforo==='amarillo').length;
   const ro=registros.filter(r=>r.semaforo==='rojo').length;
@@ -3211,9 +3288,9 @@ function cerrarM() { document.getElementById('modal').classList.remove('abierto'
 
 // ── EXPORTACIÓN A EXCEL ──────────────────────────────────────────────────────
 function exportarExcel() {
-  if (registros.length===0) { alert('No hay registros para exportar.'); return; }
+  if (registros.length===0) { avisar('No hay registros para exportar.'); return; }
   if (typeof XLSX === 'undefined') {
-    alert('No fue posible cargar el componente de Excel. Revise su conexión e intente nuevamente.');
+    avisar('No fue posible cargar el componente de Excel. Revise su conexión e intente nuevamente.');
     return;
   }
 
@@ -3774,16 +3851,16 @@ function iniciarApp() {
 // número candidato dentro de esa misma selección.
 function usarSeleccionWord() {
   if (typeof Office === 'undefined' || !Office.context || !Office.context.document) {
-    alert('Esta función solo está disponible cuando la herramienta se ejecuta como complemento dentro de Word.');
+    avisar('Esta función solo está disponible cuando la herramienta se ejecuta como complemento dentro de Word.');
     return;
   }
   Office.context.document.getSelectedDataAsync(Office.CoercionType.Text, (result) => {
     if (result.status !== Office.AsyncResultStatus.Succeeded) {
-      alert('No fue posible leer la selección de Word. Seleccione una frase en el documento e intente de nuevo.');
+      avisar('No fue posible leer la selección de Word. Seleccione una frase en el documento e intente de nuevo.');
       return;
     }
     const texto = String(result.value || '').replace(/\s+/g, ' ').trim();
-    if (!texto) { alert('Seleccione primero una frase en el documento de Word.'); return; }
+    if (!texto) { avisar('Seleccione primero una frase en el documento de Word.'); return; }
 
     const inpCtx = document.getElementById('inp-ctx');
     if (inpCtx) inpCtx.value = texto;
@@ -3812,22 +3889,97 @@ function detectarPrimeraCifraEnTexto(texto) {
   return null;
 }
 
-// office.js exige inicializar mediante Office.onReady antes de usar cualquier
-// API de Office. Si el script no cargó (por ejemplo, al usarla como página
-// web independiente sin conexión a ese CDN), la herramienta sigue funcionando
-// igual, solo sin la integración con Word.
-if (typeof Office !== 'undefined' && Office.onReady) {
-  Office.onReady((info) => {
-    if (info && info.host) {
+// ── ARRANQUE ────────────────────────────────────────────────────────────────
+// Dentro de Word el panel no tiene consola: si algo falla al iniciar, lo único
+// que ve la persona usuaria es una pantalla en blanco. Por eso el arranque
+// está blindado en tres frentes: nunca se queda esperando a Office para
+// siempre, nunca deja el cuerpo oculto, y cualquier error se muestra dentro
+// del propio panel en vez de perderse.
+
+const ESPERA_MAXIMA_OFFICE_MS = 5000;
+let _appIniciada = false;
+
+// office.js oculta el cuerpo del documento mientras negocia con el host. Si esa
+// negociación no termina, hay que devolverlo a la vista a mano.
+function asegurarPanelVisible() {
+  const b = document.body;
+  if (!b) return;
+  if (b.style.visibility === 'hidden') b.style.visibility = 'visible';
+  if (b.style.display === 'none') b.style.display = '';
+}
+
+function mostrarErrorArranque(error, origen) {
+  asegurarPanelVisible();
+  const detalle = error && error.stack ? error.stack : String(error);
+  const aviso = document.createElement('div');
+  aviso.setAttribute('role', 'alert');
+  aviso.style.cssText = 'margin:16px;padding:14px 16px;border:1px solid #B91C1C;border-left-width:5px;background:#FEF2F2;color:#7F1D1D;font-size:13px;line-height:1.5;border-radius:6px';
+  const titulo = document.createElement('strong');
+  titulo.textContent = 'No fue posible iniciar el complemento.';
+  const texto = document.createElement('div');
+  texto.style.cssText = 'margin-top:6px';
+  texto.textContent = `Origen: ${origen}. Reporte este detalle a quien da soporte:`;
+  const pre = document.createElement('pre');
+  pre.style.cssText = 'margin-top:8px;padding:8px;background:#fff;border:1px solid #FECACA;border-radius:4px;white-space:pre-wrap;word-break:break-word;font-size:11px;max-height:180px;overflow:auto';
+  pre.textContent = detalle;
+  aviso.append(titulo, texto, pre);
+  document.body.prepend(aviso);
+  console.error('Fallo al iniciar el complemento', error);
+}
+
+// Cualquier excepción que se escape queda a la vista, no en una consola que
+// dentro de Word nadie puede abrir.
+window.addEventListener('error', (ev) => {
+  if (_appIniciada) return;
+  mostrarErrorArranque(ev.error || ev.message, 'error de carga');
+});
+
+function arrancarApp(origen) {
+  if (_appIniciada) return;
+  _appIniciada = true;
+  try {
+    asegurarPanelVisible();
+    // pdf.js se carga con `defer`: su worker solo puede configurarse aquí.
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+    }
+    if (_hayWordSettings()) {
       const btn = document.getElementById('btn-usar-seleccion');
       if (btn) btn.style.display = 'inline-flex';
+      cargarDesdeWordSettingsAlIniciar();
     }
-    cargarDesdeWordSettingsAlIniciar();
     iniciarApp();
-  });
-} else {
-  iniciarApp();
+  } catch (e) {
+    mostrarErrorArranque(e, origen);
+  }
 }
+
+function cuandoElDomEsteListo(fn) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fn, { once: true });
+  } else {
+    fn();
+  }
+}
+
+cuandoElDomEsteListo(() => {
+  // Con office.js presente conviene esperar a Office.onReady, porque solo
+  // después se puede leer el progreso guardado dentro del .docx. Pero esa
+  // espera nunca es indefinida: si el host no responde, la herramienta arranca
+  // igual y sigue siendo utilizable, solo que sin integración con Word.
+  if (typeof Office !== 'undefined' && Office.onReady) {
+    const respaldo = setTimeout(
+      () => arrancarApp('Office no respondió a tiempo; se continúa sin integración con Word'),
+      ESPERA_MAXIMA_OFFICE_MS
+    );
+    Office.onReady(() => {
+      clearTimeout(respaldo);
+      arrancarApp('Office');
+    });
+  } else {
+    arrancarApp('navegador sin Office');
+  }
+});
 </script>
 </body>
 </html>
