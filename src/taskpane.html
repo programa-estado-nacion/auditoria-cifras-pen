@@ -745,20 +745,22 @@ function _hayWordSettings() {
   return typeof Office !== 'undefined' && Office.context && Office.context.document && Office.context.document.settings;
 }
 
-function guardarEnWordSettings(clave, valor) {
+function guardarEnWordSettings(clave, valor, inmediato = false) {
   if (!_hayWordSettings()) return;
   try {
     Office.context.document.settings.set(clave, JSON.stringify(valor));
     // saveAsync se agrupa (debounce) para no saturar a Word con guardados
     // seguidos cuando se marcan varias cifras revisadas rápidamente.
     clearTimeout(_guardadoWordPendiente);
-    _guardadoWordPendiente = setTimeout(() => {
+    const persistir = () => {
       Office.context.document.settings.saveAsync((res) => {
         if (res.status !== Office.AsyncResultStatus.Succeeded) {
           console.warn('No se pudo guardar el progreso dentro del documento de Word.', res.error);
         }
       });
-    }, 600);
+    };
+    if (inmediato) persistir();
+    else _guardadoWordPendiente = setTimeout(persistir, 600);
   } catch(e) { console.warn('Error guardando en Office.context.document.settings', e); }
 }
 
@@ -2952,9 +2954,9 @@ function limpiar() {
   document.getElementById('resultados-busqueda').innerHTML='';
 }
 
-function guardar() {
+function guardar(inmediato = false) {
   try { localStorage.setItem('en_auditoria', JSON.stringify(registros)); } catch(e) {}
-  guardarEnWordSettings('en_auditoria', registros);
+  guardarEnWordSettings('en_auditoria', registros, inmediato);
 }
 
 // ── STATS ────────────────────────────────────────────────────────────────────
@@ -3025,7 +3027,7 @@ function renderLista() {
   }
   cont.innerHTML=filtrados.map(r=>{
     const s=SEM[r.semaforo]||SEM.pendiente;
-    const isE=expandido===r.id;
+    const isE=mismoId(expandido,r.id);
     const semOpts=[{v:'verde',l:'🟢 Verificado'},{v:'amarillo',l:'🟡 En revisión'},{v:'rojo',l:'🔴 Con problema'},{v:'pendiente',l:'⚪ Sin marcar'}]
       .map(o=>`<option value="${o.v}"${o.v===r.semaforo?' selected':''}>${o.l}</option>`).join('');
     const revOpts = opcionesRevisorHTML(r.revisor || 'Sin asignar');
@@ -3087,9 +3089,10 @@ function renderLista() {
   }).join('');
 }
 
-function tog(id) { expandido=expandido===id?null:id; renderLista(); }
+function mismoId(a, b) { return String(a ?? '') === String(b ?? ''); }
+function tog(id) { expandido=mismoId(expandido,id)?null:String(id); renderLista(); }
 function upd(id,campo,valor) {
-  const r=registros.find(x=>x.id===id);
+  const r=registros.find(x=>mismoId(x.id,id));
   if (!r) return;
   r[campo]=valor;
   if (campo==='fuente_seleccionada') {
@@ -3101,9 +3104,14 @@ function upd(id,campo,valor) {
 }
 function eliminar(id) {
   if (!confirm('¿Eliminar este registro?')) return;
-  registros=registros.filter(r=>r.id!==id);
-  if (expandido===id) expandido=null;
-  guardar(); actualizarStats(); renderLista();
+  const indice=registros.findIndex(r=>mismoId(r.id,id));
+  if (indice<0) {
+    alert('No fue posible encontrar el registro que se desea eliminar.');
+    return;
+  }
+  registros.splice(indice,1);
+  if (mismoId(expandido,id)) expandido=null;
+  guardar(true); actualizarStats(); renderLista();
 }
 
 // ── REPORTE ──────────────────────────────────────────────────────────────────
