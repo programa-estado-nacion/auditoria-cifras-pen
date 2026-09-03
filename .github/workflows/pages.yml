@@ -1,4 +1,4 @@
-# Publica el contenido de src/ (la interfaz del complemento) en GitHub Pages.
+# Publica la interfaz y el manifiesto de producción en GitHub Pages.
 # Cada push a main actualiza el sitio; los usuarios reciben la versión nueva
 # al reabrir Word, sin reinstalar el complemento.
 name: Publicar en GitHub Pages
@@ -26,8 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Preparar sitio y manifiesto
+        run: |
+          mkdir public
+          cp -R src/. public/
+          sed 's|__BASE_URL__|https://programa-estado-nacion.github.io/auditoria-cifras-pen|g' \
+            deploy/manifest.prod.xml > public/manifest.xml
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: src
+          path: public
       - id: despliegue
         uses: actions/deploy-pages@v4
