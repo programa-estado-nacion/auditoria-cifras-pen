@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Auditoría de Cifras — revisión PEN v19.1</title>
-  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <title>Auditoría de Cifras PEN</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png"/>
+  <script src="vendor/mammoth.browser.min.js"></script>
+  <script src="vendor/pdf.min.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
   <!-- Requerido para funcionar como complemento (task pane) de Word, incluido Word en línea. -->
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <style>
@@ -692,7 +693,7 @@
 <script>
 if (typeof pdfjsLib !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    'vendor/pdf.worker.min.js';
 }
 
 // ── ESTADO ──────────────────────────────────────────────────────────────────
@@ -1083,6 +1084,7 @@ function progreso(visible, msg='', pct=0, det='') {
 
 // ── CARGA MASIVA: COLA + PROCESO ─────────────────────────────────────────────
 const EXTS_OK = ['docx','pdf','xlsx','xls','html','htm','txt','csv','tsv','md','json','xml'];
+const MAX_ARCHIVO_BYTES = 50 * 1024 * 1024;
 let cola = [];   // archivos File() esperando ser procesados
 
 function filtrarCompatibles(files) {
@@ -1118,6 +1120,8 @@ async function leerEntry(entry, lista) {
 function initDrop() {
   const zona = document.getElementById('zona-drop-principal');
   if (!zona) return;
+  if (zona.dataset.dropInicializado === 'si') return;
+  zona.dataset.dropInicializado = 'si';
 
   // Prevenir comportamiento por defecto del navegador en toda la página
   // (sin esto el navegador abre el archivo al soltarlo)
@@ -1182,7 +1186,12 @@ function initDrop() {
 
 // Agregar archivos a la cola de espera
 function agregarACola(filesRaw) {
-  const nuevos = filtrarCompatibles(filesRaw);
+  const compatibles = filtrarCompatibles(filesRaw);
+  const demasiadoGrandes = compatibles.filter(f => f.size > MAX_ARCHIVO_BYTES);
+  if (demasiadoGrandes.length > 0) {
+    alert(`No se agregaron ${demasiadoGrandes.length} archivo(s) de más de 50 MB:\n${demasiadoGrandes.map(f => f.name).join('\n')}`);
+  }
+  const nuevos = compatibles.filter(f => f.size <= MAX_ARCHIVO_BYTES);
   if (nuevos.length === 0) return;
 
   // Evitar duplicados por nombre
@@ -1288,6 +1297,7 @@ async function procesarCola() {
 
   if (errores.length > 0) {
     console.warn('No se pudieron leer:', errores);
+    alert(`No fue posible leer ${errores.length} archivo(s):\n${errores.join('\n')}\n\nCompruebe el formato y vuelva a intentarlo.`);
   }
 }
 
