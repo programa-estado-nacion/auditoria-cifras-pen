@@ -56,19 +56,19 @@ La versión 19.1 requiere WordApi 1.4 para insertar comentarios nativos.
 
 ## Publicación
 
-`src/` se publica automáticamente en **GitHub Pages** con cada push a `main`
-(ver `.github/workflows/pages.yml`).
+El repositorio no ejecuta GitHub Actions ni publica cambios automáticamente. Para una
+entrega, se hospeda el contenido de `src/` en el servicio HTTPS elegido.
 
 Para regenerar el manifiesto de producción:
 
 ```bash
-./deploy/configurar-url.sh https://programa-estado-nacion.github.io/auditoria-cifras-pen
+./deploy/configurar-url.sh https://URL-DEL-SITIO
 ```
 
 Ese `manifest-produccion.xml` es el archivo que se reparte a los usuarios; no se versiona
 porque se regenera a partir de la plantilla. Detalles de distribución en
 [`deploy/GUIA-DESPLIEGUE.md`](deploy/GUIA-DESPLIEGUE.md).
 
-Al actualizar la interfaz **no hace falta repartir un manifiesto nuevo**: basta con el
-push, y los usuarios reciben los cambios al reabrir Word. Solo cambia el manifiesto si se
-cambia la URL o se agregan botones.
+Mientras la URL no cambie, basta con volver a publicar el contenido de `src/`; los
+usuarios reciben la actualización al reabrir Word. Solo hace falta repartir otro
+manifiesto si cambia la URL o se agregan botones.
