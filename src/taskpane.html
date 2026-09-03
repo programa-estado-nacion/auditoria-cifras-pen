@@ -3084,7 +3084,7 @@ function renderLista() {
           </div>
         </div>
         <div style="font-size:11px;color:#9CA3AF;">Registrada el ${r.fecha}</div>
-        <div class="det-acciones"><button class="btn-del" onclick="eliminar('${r.id}')">Eliminar registro</button></div>
+        <div class="det-acciones"><button type="button" class="btn-del" onclick="event.stopPropagation(); solicitarEliminar('${r.id}',this)">Eliminar registro</button></div>
       </div>`:''}
     </div>`;
   }).join('');
@@ -3103,8 +3103,20 @@ function upd(id,campo,valor) {
   guardar(); actualizarStats();
   if (['semaforo','revisor','fuente_seleccionada','tipo_fuente','respaldo_guardado','unidad_periodo_verificados','consistencia_visual','consistencia_interna'].includes(campo)) renderLista();
 }
+function solicitarEliminar(id, boton) {
+  if (boton.dataset.confirmar !== 'si') {
+    boton.dataset.confirmar = 'si';
+    boton.textContent = 'Confirmar eliminación';
+    setTimeout(() => {
+      if (!boton.isConnected || boton.dataset.confirmar !== 'si') return;
+      delete boton.dataset.confirmar;
+      boton.textContent = 'Eliminar registro';
+    }, 4000);
+    return;
+  }
+  eliminar(id);
+}
 function eliminar(id) {
-  if (!confirm('¿Eliminar este registro?')) return;
   const indice=registros.findIndex(r=>mismoId(r.id,id));
   if (indice<0) {
     alert('No fue posible encontrar el registro que se desea eliminar.');
