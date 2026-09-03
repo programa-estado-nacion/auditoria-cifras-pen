@@ -12,8 +12,8 @@
   <DefaultLocale>es-CR</DefaultLocale>
   <DisplayName DefaultValue="Auditoría de Cifras PEN"/>
   <Description DefaultValue="Detecta cifras en el documento abierto, las verifica contra documentos fuente y registra la revisión con comentarios y resaltado por semáforo."/>
-  <IconUrl DefaultValue="__BASE_URL__/assets/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="__BASE_URL__/assets/icon-80.png"/>
+  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-80.png"/>
   <SupportUrl DefaultValue="https://estadonacion.or.cr/"/>
 
   <Hosts>
@@ -27,7 +27,7 @@
   </Requirements>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="__BASE_URL__/taskpane.html"/>
+    <SourceLocation DefaultValue="https://localhost:3000/taskpane.html"/>
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -74,12 +74,12 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="__BASE_URL__/assets/icon-16.png"/>
-        <bt:Image id="Icon.32" DefaultValue="__BASE_URL__/assets/icon-32.png"/>
-        <bt:Image id="Icon.80" DefaultValue="__BASE_URL__/assets/icon-80.png"/>
+        <bt:Image id="Icon.16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
+        <bt:Image id="Icon.32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
+        <bt:Image id="Icon.80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="__BASE_URL__/taskpane.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://estadonacion.or.cr/"/>
       </bt:Urls>
       <bt:ShortStrings>

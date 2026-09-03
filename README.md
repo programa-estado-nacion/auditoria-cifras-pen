@@ -24,4 +24,5 @@ npm start
 ```
 
 El servidor local usa `https://localhost:3000`; para probar el complemento se carga
-`manifest.xml` en Word. La aplicación está en `src/taskpane.html` y no requiere build.
+`manifest.dev.xml` en Word. `manifest.xml` siempre apunta a producción. La aplicación
+está en `src/taskpane.html` y no requiere build.

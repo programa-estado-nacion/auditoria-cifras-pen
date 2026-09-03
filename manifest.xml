@@ -12,8 +12,8 @@
   <DefaultLocale>es-CR</DefaultLocale>
   <DisplayName DefaultValue="Auditoría de Cifras PEN"/>
   <Description DefaultValue="Detecta cifras en el documento abierto, las verifica contra documentos fuente y registra la revisión con comentarios y resaltado por semáforo."/>
-  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+  <IconUrl DefaultValue="https://programa-estado-nacion.github.io/auditoria-cifras-pen/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://programa-estado-nacion.github.io/auditoria-cifras-pen/assets/icon-80.png"/>
   <SupportUrl DefaultValue="https://estadonacion.or.cr/"/>
 
   <Hosts>
@@ -21,13 +21,13 @@
   </Hosts>
 
   <Requirements>
-    <Sets DefaultMinVersion="1.3">
+    <Sets DefaultMinVersion="1.4">
       <Set Name="WordApi" MinVersion="1.4"/>
     </Sets>
   </Requirements>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://localhost:3000/taskpane.html"/>
+    <SourceLocation DefaultValue="https://programa-estado-nacion.github.io/auditoria-cifras-pen/taskpane.html"/>
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -74,12 +74,12 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
-        <bt:Image id="Icon.32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-        <bt:Image id="Icon.80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+        <bt:Image id="Icon.16" DefaultValue="https://programa-estado-nacion.github.io/auditoria-cifras-pen/assets/icon-16.png"/>
+        <bt:Image id="Icon.32" DefaultValue="https://programa-estado-nacion.github.io/auditoria-cifras-pen/assets/icon-32.png"/>
+        <bt:Image id="Icon.80" DefaultValue="https://programa-estado-nacion.github.io/auditoria-cifras-pen/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://programa-estado-nacion.github.io/auditoria-cifras-pen/taskpane.html"/>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://estadonacion.or.cr/"/>
       </bt:Urls>
       <bt:ShortStrings>

@@ -33,10 +33,14 @@ El despliegue también genera el manifiesto público en
 
 ---
 
-## Parte B — Generar el manifiesto con tu URL
+## Parte B — Obtener el manifiesto
 
-Ya hay uno generado y verificado en `deploy/manifest-produccion.xml`. Solo hace falta
-regenerarlo si cambia la URL de hospedaje.
+Descargue el manifiesto listo para Word desde:
+
+`https://programa-estado-nacion.github.io/auditoria-cifras-pen/manifest.xml`
+
+El archivo `manifest.xml` de la raíz del repositorio es la misma versión de producción.
+Solo hace falta regenerarlo si cambia la URL de hospedaje.
 
 En Windows, desde la carpeta `deploy/` en PowerShell:
 
@@ -50,8 +54,8 @@ En macOS o Linux:
 ./deploy/configurar-url.sh https://programa-estado-nacion.github.io/auditoria-cifras-pen
 ```
 
-Esto crea **`manifest-produccion.xml`** ya apuntando a tu sitio. Ese es el archivo que
-repartirás (NO el `manifest.xml`, que es solo para tu desarrollo local con localhost).
+Esto crea **`manifest-produccion.xml`** apuntando al sitio indicado. Para desarrollo
+local se usa `manifest.dev.xml`, que apunta a `https://localhost:3000`.
 
 ---
 
@@ -60,7 +64,7 @@ repartirás (NO el `manifest.xml`, que es solo para tu desarrollo local con loca
 1. Crea una carpeta en un recurso de red accesible por tus colegas, por ejemplo
    `\\servidor\complementos\AuditoriaPEN` (o una carpeta compartida de OneDrive/SharePoint
    mapeada como unidad de red).
-2. Copia ahí **`manifest-produccion.xml`**.
+2. Copia ahí el **`manifest.xml`** descargado.
 3. Dales permiso de **lectura** a las personas que lo usarán.
 
 ---
