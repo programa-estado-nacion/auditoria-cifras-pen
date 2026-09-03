@@ -2528,6 +2528,33 @@ function seleccionarCoincidencia(ri, hi) {
   renderResultados(document.getElementById('inp-cifra').value.trim(), ultimasBusquedas, resumenBusquedaActual);
 }
 
+// ── COMENTARIO NATIVO DE WORD AL MARCAR UNA CIFRA COMO REVISADA (v19) ─────
+// Inserta un comentario real de Word (el de la barra lateral de comentarios,
+// no un texto suelto) en el lugar donde aparece la cifra en el documento,
+// para dejar constancia visible de que ya se revisó. Requiere WordApi 1.4.
+// Si el texto de la cifra no aparece literal en el documento (por ejemplo,
+// si se tecleó distinto a como está escrito ahí), no se agrega el
+// comentario, pero la marca de "revisada" en el panel y en el documento
+// (guardarEnWordSettings) queda igual: esto nunca interrumpe la revisión.
+async function insertarComentarioWordSiCorresponde(textoCifra, mensaje) {
+  if (typeof Word === 'undefined' || !_hayWordSettings()) return;
+  const texto = String(textoCifra || '').trim();
+  if (!texto) return;
+  try {
+    await Word.run(async (context) => {
+      const resultados = context.document.body.search(texto, { matchCase: false, matchWholeWord: false });
+      resultados.load('items');
+      await context.sync();
+      if (resultados.items.length > 0) {
+        resultados.items[0].insertComment(mensaje);
+        await context.sync();
+      }
+    });
+  } catch(e) {
+    console.warn('No se pudo insertar el comentario nativo de Word (revise que Word admita WordApi 1.4).', e);
+  }
+}
+
 function toggleFuenteRevisada(ri, checked) {
   const r = ultimasBusquedas[ri];
   if (!r) return;
@@ -2899,7 +2926,14 @@ function registrar() {
     ...leerControlManualFormulario(),
   });
 
+  const semRegistrado = semActual;
+  const fuenteRegistrada = fuenteSeleccionada;
   guardar(); limpiar(); actualizarStats(); renderLista();
+
+  const SEM_TXT = {verde:'Verificada', amarillo:'En revisión', rojo:'Con problema'};
+  insertarComentarioWordSiCorresponde(cifra,
+    `Cifra "${cifra}" registrada en Auditoría de Cifras PEN — resultado: ${SEM_TXT[semRegistrado] || semRegistrado}. Fuente: ${fuenteRegistrada}. ${new Date().toLocaleDateString('es-CR')}.`);
+
   document.getElementById('inp-cifra').focus();
   window.scrollTo({top:0, behavior:'smooth'});
 }
