@@ -30,6 +30,7 @@ jobs:
         run: |
           mkdir public
           cp -R src/. public/
+          cp public/taskpane.html public/index.html
           sed 's|__BASE_URL__|https://programa-estado-nacion.github.io/auditoria-cifras-pen|g' \
             deploy/manifest.prod.xml > public/manifest.xml
       - uses: actions/upload-pages-artifact@v3
