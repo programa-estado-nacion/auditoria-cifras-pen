@@ -9,19 +9,22 @@ Resumen del flujo:
 
 ---
 
-## Parte A — Hospedar los archivos
+## Parte A — Hospedar los archivos (ya está hecho)
 
-El repositorio no ejecuta GitHub Actions ni publica la interfaz automáticamente. Sube el
-contenido de `src/` a Netlify, un servidor institucional u otro servicio HTTPS y anota la
-URL resultante, por ejemplo:
+La interfaz del complemento se publica sola en **GitHub Pages** desde el repositorio
+`programa-estado-nacion/auditoria-cifras-pen`. La URL es:
 
 ```
-https://URL-DEL-SITIO/
+https://programa-estado-nacion.github.io/auditoria-cifras-pen/
 ```
 
-Comprueba el despliegue abriendo `https://URL-DEL-SITIO/taskpane.html` en el navegador.
+Cada vez que se sube un cambio a la rama `main`, GitHub vuelve a publicar el contenido de
+`src/` automáticamente. No hay que arrastrar carpetas ni hacer nada manual.
 
-> Privacidad: en el hospedaje solo viven los archivos de la interfaz (HTML/JS/CSS). Los
+Se puede comprobar abriendo en el navegador
+`https://programa-estado-nacion.github.io/auditoria-cifras-pen/taskpane.html` (debe cargar el panel).
+
+> Privacidad: en GitHub Pages solo viven los archivos de la interfaz (HTML/JS/CSS). Los
 > documentos que se auditan **nunca salen de la computadora** de cada usuario; el
 > procesamiento es local dentro de Word.
 
@@ -35,13 +38,13 @@ regenerarlo si cambia la URL de hospedaje.
 En Windows, desde la carpeta `deploy/` en PowerShell:
 
 ```
-.\configurar-url.ps1 -Url "https://URL-DEL-SITIO"
+.\configurar-url.ps1 -Url "https://programa-estado-nacion.github.io/auditoria-cifras-pen"
 ```
 
 En macOS o Linux:
 
 ```
-./deploy/configurar-url.sh https://URL-DEL-SITIO
+./deploy/configurar-url.sh https://programa-estado-nacion.github.io/auditoria-cifras-pen
 ```
 
 Esto crea **`manifest-produccion.xml`** ya apuntando a tu sitio. Ese es el archivo que
@@ -78,15 +81,16 @@ Listo: aparece el botón **Auditoría de cifras** y el panel funciona, sin conso
 
 ## Actualizaciones futuras
 
-Cuando mejores el complemento, edita los archivos de `src/`, registra el cambio en Git y
-vuelve a publicar `src/` manualmente en el hospedaje elegido:
+Cuando mejores el complemento (por ejemplo, la tolerancia de redondeo), edita los
+archivos de `src/` y sube el cambio:
 
 ```
 git add -A && git commit -m "descripción del cambio" && git push
 ```
 
-Los usuarios reciben la versión publicada al reabrir Word; **no reinstalan nada**. Solo
-tendrías que repartir un manifiesto nuevo si cambias la URL o agregas botones.
+GitHub publica la versión nueva en un par de minutos. Los usuarios la reciben
+automáticamente al reabrir Word; **no reinstalan nada**. Solo tendrías que repartir un
+manifiesto nuevo si cambias la URL o agregas botones.
 
 Como todo queda en el repositorio, siempre se puede ver qué cambió y volver a una versión
 anterior.
