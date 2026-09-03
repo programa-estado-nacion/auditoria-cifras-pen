@@ -746,22 +746,20 @@ function _hayWordSettings() {
   return typeof Office !== 'undefined' && Office.context && Office.context.document && Office.context.document.settings;
 }
 
-function guardarEnWordSettings(clave, valor, inmediato = false) {
+function guardarEnWordSettings(clave, valor) {
   if (!_hayWordSettings()) return;
   try {
     Office.context.document.settings.set(clave, JSON.stringify(valor));
     // saveAsync se agrupa (debounce) para no saturar a Word con guardados
     // seguidos cuando se marcan varias cifras revisadas rápidamente.
     clearTimeout(_guardadoWordPendiente);
-    const persistir = () => {
+    _guardadoWordPendiente = setTimeout(() => {
       Office.context.document.settings.saveAsync((res) => {
         if (res.status !== Office.AsyncResultStatus.Succeeded) {
           console.warn('No se pudo guardar el progreso dentro del documento de Word.', res.error);
         }
       });
-    };
-    if (inmediato) persistir();
-    else _guardadoWordPendiente = setTimeout(persistir, 600);
+    }, 600);
   } catch(e) { console.warn('Error guardando en Office.context.document.settings', e); }
 }
 
@@ -2955,9 +2953,9 @@ function limpiar() {
   document.getElementById('resultados-busqueda').innerHTML='';
 }
 
-function guardar(inmediato = false) {
+function guardar() {
   try { localStorage.setItem('en_auditoria', JSON.stringify(registros)); } catch(e) {}
-  guardarEnWordSettings('en_auditoria', registros, inmediato);
+  guardarEnWordSettings('en_auditoria', registros);
 }
 
 // ── STATS ────────────────────────────────────────────────────────────────────
@@ -3028,7 +3026,7 @@ function renderLista() {
   }
   cont.innerHTML=filtrados.map(r=>{
     const s=SEM[r.semaforo]||SEM.pendiente;
-    const isE=mismoId(expandido,r.id);
+    const isE=expandido===r.id;
     const semOpts=[{v:'verde',l:'🟢 Verificado'},{v:'amarillo',l:'🟡 En revisión'},{v:'rojo',l:'🔴 Con problema'},{v:'pendiente',l:'⚪ Sin marcar'}]
       .map(o=>`<option value="${o.v}"${o.v===r.semaforo?' selected':''}>${o.l}</option>`).join('');
     const revOpts = opcionesRevisorHTML(r.revisor || 'Sin asignar');
@@ -3084,16 +3082,15 @@ function renderLista() {
           </div>
         </div>
         <div style="font-size:11px;color:#9CA3AF;">Registrada el ${r.fecha}</div>
-        <div class="det-acciones"><button type="button" class="btn-del" onclick="event.stopPropagation(); solicitarEliminar('${r.id}',this)">Eliminar registro</button></div>
+        <div class="det-acciones"><button class="btn-del" onclick="eliminar('${r.id}')">Eliminar registro</button></div>
       </div>`:''}
     </div>`;
   }).join('');
 }
 
-function mismoId(a, b) { return String(a ?? '') === String(b ?? ''); }
-function tog(id) { expandido=mismoId(expandido,id)?null:String(id); renderLista(); }
+function tog(id) { expandido=expandido===id?null:id; renderLista(); }
 function upd(id,campo,valor) {
-  const r=registros.find(x=>mismoId(x.id,id));
+  const r=registros.find(x=>x.id===id);
   if (!r) return;
   r[campo]=valor;
   if (campo==='fuente_seleccionada') {
@@ -3103,28 +3100,11 @@ function upd(id,campo,valor) {
   guardar(); actualizarStats();
   if (['semaforo','revisor','fuente_seleccionada','tipo_fuente','respaldo_guardado','unidad_periodo_verificados','consistencia_visual','consistencia_interna'].includes(campo)) renderLista();
 }
-function solicitarEliminar(id, boton) {
-  if (boton.dataset.confirmar !== 'si') {
-    boton.dataset.confirmar = 'si';
-    boton.textContent = 'Confirmar eliminación';
-    setTimeout(() => {
-      if (!boton.isConnected || boton.dataset.confirmar !== 'si') return;
-      delete boton.dataset.confirmar;
-      boton.textContent = 'Eliminar registro';
-    }, 4000);
-    return;
-  }
-  eliminar(id);
-}
 function eliminar(id) {
-  const indice=registros.findIndex(r=>mismoId(r.id,id));
-  if (indice<0) {
-    alert('No fue posible encontrar el registro que se desea eliminar.');
-    return;
-  }
-  registros.splice(indice,1);
-  if (mismoId(expandido,id)) expandido=null;
-  guardar(true); actualizarStats(); renderLista();
+  if (!confirm('¿Eliminar este registro?')) return;
+  registros=registros.filter(r=>r.id!==id);
+  if (expandido===id) expandido=null;
+  guardar(); actualizarStats(); renderLista();
 }
 
 // ── REPORTE ──────────────────────────────────────────────────────────────────
